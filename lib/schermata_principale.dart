@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'homeView.dart';
-import 'searchView.dart';
-import 'analisiView.dart';
+import 'home_view.dart';
+import 'search_view.dart';
+import 'analisi_view.dart';
 
 void main(){
   runApp(const SchermataP());
@@ -27,17 +27,17 @@ class _SchermataPState extends State<SchermataP> {
         title: 'app name !!',
         initialRoute: '/',
         routes: {
-          '/searchView': (context) => const searchView(),
-          '/detailsView': (context) => const detailsView(),
-          '/homeView': (context) => const homeView(),
+          '/searchView': (context) => const SearchView(),
+          '/detailsView': (context) => const DetailsView(),
+          '/homeView': (context) => const HomeView(),
         },
         home: Scaffold(
             body: IndexedStack(
               index: realIndex,
               children: const [
-                homeView(),
-                searchView(),
-                detailsView(),
+                HomeView(),
+                SearchView(),
+                DetailsView(),
               ]),
             bottomNavigationBar: BottomNavigationBar(
               currentIndex: realIndex,

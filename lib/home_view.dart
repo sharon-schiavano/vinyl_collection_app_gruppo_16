@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class homeView extends StatelessWidget {
-  const homeView({super.key});
+class HomeView extends StatelessWidget {
+  const HomeView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -75,8 +75,7 @@ class homeView extends StatelessWidget {
                     letterSpacing: 2,
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios)
-              ]
+              ],
             ),
             SizedBox(height: 20),
             SizedBox(
