@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class homeView extends StatelessWidget {
-  const homeView({super.key});
+class HomeView extends StatelessWidget {
+  const HomeView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +22,8 @@ class homeView extends StatelessWidget {
                     letterSpacing: 2,
                   ),
                 ),
-                Icon(Icons.account_circle)
-              ]
+                Icon(Icons.account_circle),
+              ],
             ),
             SizedBox(height: 50),
             Row(
@@ -38,21 +38,20 @@ class homeView extends StatelessWidget {
                     letterSpacing: 2,
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios)
-              ]
+                Icon(Icons.arrow_forward_ios),
+              ],
             ),
             SizedBox(height: 20),
             SizedBox(
               height: 120,
               child: ListView.separated(
-                scrollDirection: Axis.horizontal, 
-                itemCount: 10, // numero di vinili da mostrare, useremo list.length
+                scrollDirection: Axis.horizontal,
+                itemCount:
+                    10, // numero di vinili da mostrare, useremo list.length
                 separatorBuilder: (context, index) => SizedBox(width: 10),
                 itemBuilder: (context, index) => Container(
                   width: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.deepPurple[100],
-                  ),
+                  decoration: BoxDecoration(color: Colors.deepPurple[100]),
                   child: Center(
                     child: Text(
                       'Vinile ${index + 1}',
@@ -75,21 +74,20 @@ class homeView extends StatelessWidget {
                     letterSpacing: 2,
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios)
-              ]
+                Icon(Icons.arrow_forward_ios),
+              ],
             ),
             SizedBox(height: 20),
             SizedBox(
               height: 120,
               child: ListView.separated(
-                scrollDirection: Axis.horizontal, 
-                itemCount: 10, // numero di vinili da mostrare, useremo list.length
+                scrollDirection: Axis.horizontal,
+                itemCount:
+                    10, // numero di vinili da mostrare, useremo list.length
                 separatorBuilder: (context, index) => SizedBox(width: 10),
                 itemBuilder: (context, index) => Container(
                   width: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.deepPurple[100],
-                  ),
+                  decoration: BoxDecoration(color: Colors.deepPurple[100]),
                   child: Center(
                     child: Text(
                       'Vinile ${index + 1}',
@@ -100,13 +98,16 @@ class homeView extends StatelessWidget {
               ),
             ),
             SizedBox(height: 50),
-            ],
-          )
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed:() => Navigator.pushNamed(context, '/searchView'), //per ora! deve portare all'aggiungi elemento
+        onPressed: () => Navigator.pushNamed(
+          context,
+          '/searchView',
+        ), //per ora! deve portare all'aggiungi elemento
         child: Icon(Icons.add),
-      )
+      ),
     );
   }
 }
