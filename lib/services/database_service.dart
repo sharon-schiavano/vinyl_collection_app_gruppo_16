@@ -1,6 +1,7 @@
+// === IMPORTAZIONI NECESSARIE ===
+// sqflite: Plugin Flutter per database SQLite locale
 import 'package:sqflite/sqflite.dart';
-// Importazioni necessarie per la gestione del database SQLite
-import 'package:sqflite/sqflite.dart';
+// path: Utility per manipolare percorsi di file in modo cross-platform
 import 'package:path/path.dart';
 import '../models/vinyl.dart';
 import '../models/category.dart' as models;
@@ -8,232 +9,360 @@ import '../utils/constants.dart';
 
 // === SERVIZIO DATABASE ===
 // Gestisce tutte le operazioni di database per l'app Vinyl Collection
-// Implementa il pattern Singleton per garantire una sola istanza
+// Implementa il pattern Singleton per garantire una sola istanza del database
+// MOTIVO SINGLETON: Evita connessioni multiple e conflitti di accesso al database
 class DatabaseService {
-  // Istanza singleton del servizio database
+  // Istanza singleton del servizio database (static = condivisa tra tutte le istanze)
   static final DatabaseService _instance = DatabaseService._internal();
-  // Factory constructor che restituisce sempre la stessa istanza
+  
+  // Factory constructor: restituisce sempre la stessa istanza invece di crearne una nuova
+  // MOTIVO: Garantisce che ci sia sempre una sola connessione al database
   factory DatabaseService() => _instance;
+  
   // Constructor privato per il pattern Singleton
+  // MOTIVO: Impedisce la creazione diretta di istanze dall'esterno
   DatabaseService._internal();
 
   // Istanza del database SQLite (nullable fino all'inizializzazione)
+  // MOTIVO STATIC: Condivisa tra tutte le istanze della classe
   static Database? _database;
 
-  // Getter per ottenere l'istanza del database
-  // Inizializza il database se non ancora fatto
+  // Getter asincrono per ottenere l'istanza del database
+  // ASYNC: Necessario perché l'inizializzazione del database è un'operazione I/O
+  // AWAIT: Aspetta che l'operazione di inizializzazione sia completata
   Future<Database> get database async {
-    // Se il database è già inizializzato, lo restituisce
+    // Lazy initialization: inizializza solo quando necessario
     if (_database != null) return _database!;
-    // Altrimenti inizializza il database
+    // AWAIT: Aspetta che l'inizializzazione sia completata prima di continuare
     _database = await _initDatabase();
     return _database!;
   }
 
   // Metodo privato per inizializzare il database
-  // Crea il file del database e definisce la struttura delle tabelle
+  // ASYNC: Le operazioni di file system sono asincrone per non bloccare l'UI
   Future<Database> _initDatabase() async {
-    // Ottiene il percorso per il database usando le costanti dell'app
+    // JOIN: Combina il percorso della directory database con il nome del file
+    // MOTIVO JOIN: Gestisce automaticamente i separatori di percorso (/ o \) per ogni OS
+    // AWAIT: getDatabasesPath() è asincrono perché accede al file system
     String path = join(await getDatabasesPath(), AppConstants.databaseName);
-    // Apre/crea il database con la versione specificata
+    
+    // AWAIT: openDatabase è asincrono perché crea/apre file dal disco
+    // onCreate: Callback chiamato solo alla prima creazione del database
     return await openDatabase(
       path,
       version: AppConstants.databaseVersion,
-      onCreate: _createDatabase, // Callback per creare le tabelle
+      onCreate: _createDatabase, // Funzione per creare la struttura iniziale
     );
   }
 
   // Metodo per creare la struttura del database
-  // Viene chiamato solo alla prima creazione del database
+  // ASYNC: Necessario perché le operazioni SQL sono asincrone
+  // CALLBACK: Viene chiamato automaticamente da SQLite solo alla prima creazione
   Future<void> _createDatabase(Database db, int version) async {
     // === CREAZIONE TABELLA VINILI ===
-    // Tabella principale per memorizzare i dati dei vinili
+    // AWAIT: Aspetta che l'operazione SQL sia completata prima di continuare
+    // EXECUTE: Esegue comandi SQL DDL (Data Definition Language)
     await db.execute('''
       CREATE TABLE ${AppConstants.vinylTable} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,  -- ID univoco auto-incrementale
-        title TEXT NOT NULL,                   -- Titolo dell'album
+        title TEXT NOT NULL,                   -- Titolo dell'album (NOT NULL = obbligatorio)
         artist TEXT NOT NULL,                  -- Nome dell'artista
         year INTEGER NOT NULL,                 -- Anno di pubblicazione
         genre TEXT NOT NULL,                   -- Genere musicale
         label TEXT NOT NULL,                   -- Casa discografica
         condition TEXT NOT NULL,               -- Condizione del vinile
-        isFavorite INTEGER NOT NULL DEFAULT 0, -- Flag preferito (0/1)
-        imagePath TEXT,                        -- Percorso immagine copertina
-        dateAdded TEXT NOT NULL,               -- Data aggiunta alla collezione
-        notes TEXT                             -- Note aggiuntive
+        isFavorite INTEGER NOT NULL DEFAULT 0, -- Flag preferito (0=false, 1=true)
+        imagePath TEXT,                        -- Percorso immagine (nullable)
+        dateAdded TEXT NOT NULL,               -- Data aggiunta (formato ISO 8601)
+        notes TEXT                             -- Note aggiuntive (nullable)
       )
     ''');
 
     // === CREAZIONE TABELLA CATEGORIE ===
-    // Tabella per organizzare i vinili in categorie personalizzate
+    // UNIQUE: Impedisce duplicati nel campo 'name'
+    // DEFAULT: Valore predefinito se non specificato
     await db.execute('''
       CREATE TABLE ${AppConstants.categoryTable} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,  -- ID univoco auto-incrementale
-        name TEXT NOT NULL UNIQUE,
-        description TEXT,
-        vinylCount INTEGER NOT NULL DEFAULT 0,
-        dateCreated TEXT NOT NULL
+        name TEXT NOT NULL UNIQUE,             -- Nome categoria (deve essere unico)
+        description TEXT,                       -- Descrizione opzionale
+        vinylCount INTEGER NOT NULL DEFAULT 0, -- Contatore vinili nella categoria
+        dateCreated TEXT NOT NULL              -- Data creazione categoria
       )
     ''');
 
-    // Inserimento categorie predefinite
+    // === INSERIMENTO DATI INIZIALI ===
+    // Popola il database con categorie predefinite
+    // FOR LOOP: Itera attraverso i generi predefiniti
     for (String genre in AppConstants.defaultGenres) {
+      // AWAIT: Aspetta che ogni inserimento sia completato
+      // INSERT: Operazione SQL DML (Data Manipulation Language)
       await db.insert(AppConstants.categoryTable, {
         'name': genre,
         'description': 'Genere musicale $genre',
         'vinylCount': 0,
+        // ISO 8601: Standard internazionale per date/orari
         'dateCreated': DateTime.now().toIso8601String(),
       });
     }
   }
 
-  // CRUD Operations per Vinyl
+  // === OPERAZIONI CRUD PER VINILI ===
+  
+  // Inserisce un nuovo vinile nel database
+  // ASYNC: Operazione I/O che non deve bloccare l'UI
+  // RETURN: ID del record inserito (auto-generato dal database)
   Future<int> insertVinyl(Vinyl vinyl) async {
+    // AWAIT: Aspetta che il database sia pronto
     final db = await database;
+    // INSERT: Converte l'oggetto Vinyl in Map per SQLite
+    // AWAIT: Aspetta che l'inserimento sia completato
     int id = await db.insert(AppConstants.vinylTable, vinyl.toMap());
+    // Aggiorna il contatore della categoria (operazione atomica)
     await _updateCategoryCount(vinyl.genre, 1);
     return id;
   }
 
+  // Recupera tutti i vinili ordinati per data di aggiunta
+  // ASYNC: Query al database è operazione asincrona
+  // RETURN: Lista di oggetti Vinyl
   Future<List<Vinyl>> getAllVinyls() async {
     final db = await database;
+    // QUERY: Operazione SQL SELECT con ordinamento
+    // ORDER BY DESC: Più recenti prima (ordine decrescente)
     final List<Map<String, dynamic>> maps = await db.query(
       AppConstants.vinylTable,
       orderBy: 'dateAdded DESC',
     );
+    // LIST.GENERATE: Converte ogni Map in oggetto Vinyl
+    // MOTIVO: SQLite restituisce Map, ma l'app usa oggetti tipizzati
     return List.generate(maps.length, (i) => Vinyl.fromMap(maps[i]));
   }
 
+  // Trova un vinile specifico tramite ID
+  // NULLABLE RETURN: Può restituire null se non trovato
   Future<Vinyl?> getVinylById(int id) async {
     final db = await database;
+    // WHERE CLAUSE: Filtra per ID specifico
+    // PLACEHOLDER (?): Previene SQL injection attacks
+    // WHERE ARGS: Valori sicuri per i placeholder
     final List<Map<String, dynamic>> maps = await db.query(
       AppConstants.vinylTable,
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'id = ?',        // Condizione SQL sicura
+      whereArgs: [id],        // Valore del placeholder
     );
+    // Controlla se è stato trovato almeno un risultato
     if (maps.isNotEmpty) {
       return Vinyl.fromMap(maps.first);
     }
-    return null;
+    return null; // Nessun vinile trovato con quell'ID
   }
 
+  // Recupera i vinili più recenti con limite configurabile
+  // PARAMETRO OPZIONALE: limit ha valore predefinito di 5
+  // LIMIT: Restringe il numero di risultati per performance
   Future<List<Vinyl>> getRecentVinyls({int limit = 5}) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       AppConstants.vinylTable,
-      orderBy: 'dateAdded DESC',
-      limit: limit,
+      orderBy: 'dateAdded DESC', // Più recenti prima
+      limit: limit,              // Limita risultati per efficienza
     );
     return List.generate(maps.length, (i) => Vinyl.fromMap(maps[i]));
   }
 
+  // Recupera solo i vinili marcati come preferiti
+  // WHERE: Filtra per campo booleano (1 = true, 0 = false)
   Future<List<Vinyl>> getFavoriteVinyls() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       AppConstants.vinylTable,
-      where: 'isFavorite = ?',
-      whereArgs: [1],
-      orderBy: 'dateAdded DESC',
+      where: 'isFavorite = ?',   // Filtra solo i preferiti
+      whereArgs: [1],            // 1 = true in SQLite
+      orderBy: 'dateAdded DESC', // Più recenti prima
     );
     return List.generate(maps.length, (i) => Vinyl.fromMap(maps[i]));
   }
 
+  // Ricerca testuale nei campi principali del vinile
+  // LIKE: Operatore SQL per ricerca parziale (case-insensitive)
+  // OR: Cerca in più campi contemporaneamente
+  // %: Wildcard che significa "qualsiasi carattere"
   Future<List<Vinyl>> searchVinyls(String query) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       AppConstants.vinylTable,
+      // OR: Cerca in titolo, artista o etichetta
       where: 'title LIKE ? OR artist LIKE ? OR label LIKE ?',
+      // %query%: Trova la query ovunque nei campi di vinyl
       whereArgs: ['%$query%', '%$query%', '%$query%'],
       orderBy: 'dateAdded DESC',
     );
     return List.generate(maps.length, (i) => Vinyl.fromMap(maps[i]));
   }
 
+  // Filtra vinili per genere musicale specifico
+  // EXACT MATCH: Ricerca esatta (non parziale come LIKE)
   Future<List<Vinyl>> getVinylsByGenre(String genre) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       AppConstants.vinylTable,
-      where: 'genre = ?',
-      whereArgs: [genre],
+      where: 'genre = ?',        // Corrispondenza esatta
+      whereArgs: [genre],        // Genere specifico
       orderBy: 'dateAdded DESC',
     );
     return List.generate(maps.length, (i) => Vinyl.fromMap(maps[i]));
   }
 
+  // Aggiorna un vinile esistente nel database
+  // UPDATE: Modifica record esistente mantenendo lo stesso ID
   Future<void> updateVinyl(Vinyl vinyl) async {
     final db = await database;
+    // UPDATE: Sostituisce tutti i campi del record
+    // WHERE: Identifica il record specifico da aggiornare
     await db.update(
       AppConstants.vinylTable,
-      vinyl.toMap(),
-      where: 'id = ?',
-      whereArgs: [vinyl.id],
+      vinyl.toMap(),           // Nuovi valori da salvare
+      where: 'id = ?',         // Condizione per trovare il record
+      whereArgs: [vinyl.id],   // ID del vinile da aggiornare
     );
   }
 
+  // Elimina un vinile dal database
+  // TRANSAZIONE LOGICA: Prima legge, poi elimina, infine aggiorna contatori
   Future<void> deleteVinyl(int id) async {
     final db = await database;
-    // Ottieni il vinile per conoscere il genere
+    // STEP 1: Recupera il vinile per conoscere il genere
+    // MOTIVO: Serve per aggiornare il contatore della categoria
     final vinyl = await getVinylById(id);
     if (vinyl != null) {
+      // STEP 2: Elimina il record dal database
       await db.delete(
         AppConstants.vinylTable,
-        where: 'id = ?',
-        whereArgs: [id],
+        where: 'id = ?',       // Identifica il record da eliminare
+        whereArgs: [id],       // ID del vinile
       );
+      // STEP 3: Decrementa il contatore della categoria
+      // -1: Sottrae uno dal conteggio
       await _updateCategoryCount(vinyl.genre, -1);
     }
   }
 
-  // CRUD Operations per Category
+  // === OPERAZIONI CRUD PER CATEGORIE ===
+  
+  // Recupera tutte le categorie ordinate alfabeticamente
+  // ASC: Ordine crescente (A-Z)
   Future<List<models.Category>> getAllCategories() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       AppConstants.categoryTable,
-      orderBy: 'name ASC',
+      orderBy: 'name ASC',     // Ordinamento alfabetico
     );
     return List.generate(maps.length, (i) => models.Category.fromMap(maps[i]));
   }
 
+  // === PATTERN ARCHITETTURALE: DUAL COUNTING STRATEGY ===
+  // 
+  // MOTIVAZIONE: Questo sistema implementa una strategia ibrida per il conteggio
+  // dei vinili per categoria, utilizzando due approcci complementari:
+  //
+  // 1. CONTATORE MANTENUTO (vinylCount nella tabella categories):
+  //    - PRO: Velocità estrema per operazioni frequenti (O(1))
+  //    - PRO: Ideale per interfacce utente responsive
+  //    - CONTRO: Rischio di inconsistenza in caso di errori/crash
+  //    - USO: Visualizzazione categorie, dashboard, operazioni CRUD
+  //
+  // 2. CONTEGGIO DINAMICO (getGenreDistribution con GROUP BY COUNT):
+  //    - PRO: Sempre accurato (source of truth)
+  //    - PRO: Auto-correttivo, non può diventare inconsistente
+  //    - CONTRO: Più lento per grandi dataset (O(n))
+  //    - USO: Report, statistiche, verifiche di integrità
+  //
+  // PATTERN: "Cache + Source of Truth"
+  // - Cache (contatore): Veloce ma potenzialmente inconsistente
+  // - Source of Truth (conteggio): Lento ma sempre corretto
+  // - Strategia: Usa cache per performance, source of truth per accuratezza
+
+  // Metodo privato per aggiornare il contatore di vinili per categoria
+  // PARTE 1 DELLA STRATEGIA IBRIDA: Mantiene cache veloce (vinylCount)
+  // RAW UPDATE: Query SQL personalizzata per operazioni aritmetiche
+  // ATOMIC OPERATION: Incremento/decremento sicuro anche con accessi concorrenti
+  // MOTIVAZIONE: Permette visualizzazione istantanea delle categorie senza query complesse
   Future<void> _updateCategoryCount(String categoryName, int delta) async {
     final db = await database;
+    // RAW UPDATE: Permette operazioni aritmetiche direttamente in SQL
+    // vinylCount + delta: Somma algebrica (delta può essere +1 o -1)
+    // VANTAGGIO: Operazione atomica che previene race conditions
     await db.rawUpdate(
       'UPDATE ${AppConstants.categoryTable} SET vinylCount = vinylCount + ? WHERE name = ?',
-      [delta, categoryName],
+      [delta, categoryName], // delta: +1 per aggiunta, -1 per rimozione
     );
   }
 
-  // Statistiche
+  // === METODI STATISTICI ===
+  
+  // Conta il numero totale di vinili nella collezione
+  // RAW QUERY: Query SQL personalizzata per funzioni aggregate
+  // COUNT(*): Funzione SQL che conta tutte le righe
   Future<int> getTotalVinylCount() async {
     final db = await database;
+    // RAW QUERY: Permette di usare funzioni SQL avanzate
+    // COUNT(*): Conta tutti i record nella tabella
+    // AS count: Alias per il risultato della funzione
     final result = await db.rawQuery('SELECT COUNT(*) as count FROM ${AppConstants.vinylTable}');
+    // FIRST: Prende il primo (e unico) risultato
+    // AS INT: Cast esplicito per type safety
     return result.first['count'] as int;
   }
 
+  // PARTE 2 DELLA STRATEGIA IBRIDA: Source of Truth per conteggio accurato
+  // Calcola la distribuzione dei vinili per genere musicale
+  // MOTIVAZIONE: Questo metodo fornisce il conteggio REALE e ACCURATO,
+  // utilizzato per verifiche di integrità e report statistici dettagliati
+  // GROUP BY: Raggruppa i record per campo specifico
+  // COUNT: Conta i record in ogni gruppo
+  // VANTAGGIO: Sempre corretto, auto-aggiornante, impossibile da corrompere
+  // SVANTAGGIO: Più lento per grandi dataset, richiede scansione completa
   Future<Map<String, int>> getGenreDistribution() async {
     final db = await database;
+    // RAW QUERY: Query complessa con raggruppamento
+    // GROUP BY: Raggruppa per genere musicale
+    // ORDER BY count DESC: Ordina per frequenza (più popolari prima)
+    // NOTA: Questa query è il "source of truth" per i conteggi
     final List<Map<String, dynamic>> result = await db.rawQuery(
       'SELECT genre, COUNT(*) as count FROM ${AppConstants.vinylTable} GROUP BY genre ORDER BY count DESC'
     );
     
+    // Converte il risultato SQL in Map Dart
     Map<String, int> distribution = {};
+    // FOR LOOP: Itera attraverso ogni riga del risultato
+    // PATTERN: Trasformazione da formato SQL a formato Dart
     for (var row in result) {
+      // Estrae genere e conteggio da ogni riga
+      // QUESTO È IL CONTEGGIO REALE: calcolato direttamente dai dati
       distribution[row['genre']] = row['count'];
     }
     return distribution;
   }
 
+  // Recupera i vinili più vecchi per anno di pubblicazione
+  // ORDER BY ASC: Ordine crescente (più vecchi prima)
   Future<List<Vinyl>> getOldestVinyls({int limit = 5}) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       AppConstants.vinylTable,
-      orderBy: 'year ASC',
-      limit: limit,
+      orderBy: 'year ASC',   // Ordina per anno crescente
+      limit: limit,          // Limita i risultati
     );
     return List.generate(maps.length, (i) => Vinyl.fromMap(maps[i]));
   }
 
+  // Chiude la connessione al database
+  // CLEANUP: Libera le risorse quando l'app viene chiusa
+  // IMPORTANTE: Chiamare sempre per evitare memory leaks
   Future<void> close() async {
     final db = await database;
+    // CLOSE: Chiude la connessione e libera le risorse
     await db.close();
   }
 }
