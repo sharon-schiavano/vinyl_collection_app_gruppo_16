@@ -1,113 +1,503 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'dart:io';
 
-class HomeView extends StatelessWidget {
+// Import dei servizi e schermate necessari
+import 'services/vinyl_provider.dart';
+import 'screens/add_edit_vinyl_screen.dart';
+import 'utils/constants.dart';
+
+class HomeView extends StatefulWidget {
   const HomeView({super.key});
 
   @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Nome App <3",
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.deepPurple,
-                    letterSpacing: 2,
-                  ),
-                ),
-                Icon(Icons.account_circle),
-              ],
-            ),
-            SizedBox(height: 50),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Lista vinili recenti aggiunti dall'utente",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.deepPurple,
-                    letterSpacing: 2,
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios),
-              ],
-            ),
-            SizedBox(height: 20),
-            SizedBox(
-              height: 120,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount:
-                    10, // numero di vinili da mostrare, useremo list.length
-                separatorBuilder: (context, index) => SizedBox(width: 10),
-                itemBuilder: (context, index) => Container(
-                  width: 100,
-                  decoration: BoxDecoration(color: Colors.deepPurple[100]),
-                  child: Center(
-                    child: Text(
-                      'Vinile ${index + 1}',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(AppConstants.defaultPadding),
+          child: Column(
+            children: [
+              // === HEADER: Intestazione app ===
+              _buildHeader(),
+              SizedBox(height: AppConstants.spacingLarge),
+              
+              // === CONTENT: Contenuto principale scrollabile ===
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // === RECENT VINYLS: Vinili recenti ===
+                      _buildRecentVinylsSection(context),
+                      SizedBox(height: AppConstants.spacingLarge),
+                      
+                      // === FAVORITE VINYLS: Vinili preferiti ===
+                      _buildFavoriteVinylsSection(context),
+                      SizedBox(height: AppConstants.spacingLarge),
+                      
+                      // === STATS: Statistiche rapide ===
+                      _buildQuickStatsSection(context),
+                    ],
                   ),
                 ),
               ),
-            ),
-            SizedBox(height: 50),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Lista vinili consigliati casualmente",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.deepPurple,
-                    letterSpacing: 2,
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios),
-              ],
-            ),
-            SizedBox(height: 20),
-            SizedBox(
-              height: 120,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount:
-                    10, // numero di vinili da mostrare, useremo list.length
-                separatorBuilder: (context, index) => SizedBox(width: 10),
-                itemBuilder: (context, index) => Container(
-                  width: 100,
-                  decoration: BoxDecoration(color: Colors.deepPurple[100]),
-                  child: Center(
-                    child: Text(
-                      'Vinile ${index + 1}',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(height: 50),
-          ],
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.pushNamed(
+        onPressed: () async {
+          // NAVIGATION: Naviga alla schermata aggiunta vinile
+          final scaffoldMessenger = ScaffoldMessenger.of(context);
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AddEditVinylScreen(),
+            ),
+          );
+          
+          // REFRESH: Ricarica dati se vinile aggiunto con successo
+          if (result == true && mounted) {
+            // Il provider si aggiorna automaticamente tramite notifyListeners
+            scaffoldMessenger.showSnackBar(
+              SnackBar(
+                content: Text('Vinile aggiunto alla collezione!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        },
+        backgroundColor: AppConstants.primaryColor,
+        tooltip: 'Aggiungi nuovo vinile',
+        child: Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+  
+  // === HEADER: Widget intestazione ===
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppConstants.appName,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: AppConstants.primaryColor,
+                letterSpacing: 1.2,
+              ),
+            ),
+            Text(
+              'La tua collezione di vinili',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+        Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppConstants.primaryColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+          ),
+          child: Icon(
+            Icons.library_music,
+            color: AppConstants.primaryColor,
+            size: 32,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // === RECENT VINYLS SECTION: Sezione vinili recenti ===
+  Widget _buildRecentVinylsSection(BuildContext context) {
+    return Consumer<VinylProvider>(
+      builder: (context, provider, child) {
+        final recentVinyls = provider.recentVinyls;
+        
+        return Column(
+          children: [
+            _buildSectionHeader(
+              'Aggiunti di Recente',
+              Icons.schedule,
+              onTap: () {
+                // Funzionalità da implementare: navigazione alla lista completa
+              },
+            ),
+            SizedBox(height: AppConstants.spacingMedium),
+            
+            if (recentVinyls.isEmpty)
+              _buildEmptyState(
+                'Nessun vinile aggiunto',
+                'Inizia aggiungendo il tuo primo vinile alla collezione!',
+                Icons.album,
+              )
+            else
+              SizedBox(
+                height: 160,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  itemCount: recentVinyls.length,
+                  separatorBuilder: (context, index) => 
+                      SizedBox(width: AppConstants.spacingMedium),
+                  itemBuilder: (context, index) {
+                    final vinyl = recentVinyls[index];
+                    return _buildVinylCard(vinyl, context);
+                  },
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // === FAVORITE VINYLS SECTION: Sezione vinili preferiti ===
+  Widget _buildFavoriteVinylsSection(BuildContext context) {
+    return Consumer<VinylProvider>(
+      builder: (context, provider, child) {
+        final favoriteVinyls = provider.favoriteVinyls;
+        
+        return Column(
+          children: [
+            _buildSectionHeader(
+              'I Tuoi Preferiti',
+              Icons.favorite,
+              onTap: () {
+                // Funzionalità da implementare: navigazione alla lista preferiti
+              },
+            ),
+            SizedBox(height: AppConstants.spacingMedium),
+            
+            if (favoriteVinyls.isEmpty)
+              _buildEmptyState(
+                'Nessun preferito',
+                'Marca i tuoi vinili preferiti per vederli qui!',
+                Icons.favorite_border,
+              )
+            else
+              SizedBox(
+                height: 160,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  itemCount: favoriteVinyls.length,
+                  separatorBuilder: (context, index) => 
+                      SizedBox(width: AppConstants.spacingMedium),
+                  itemBuilder: (context, index) {
+                    final vinyl = favoriteVinyls[index];
+                    return _buildVinylCard(vinyl, context);
+                  },
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // === QUICK STATS SECTION: Sezione statistiche rapide ===
+  Widget _buildQuickStatsSection(BuildContext context) {
+    return Consumer<VinylProvider>(
+      builder: (context, provider, child) {
+        return Column(
+          children: [
+            _buildSectionHeader(
+              'Statistiche Rapide',
+              Icons.analytics,
+              onTap: () {
+                // Funzionalità da implementare: navigazione alle statistiche complete
+              },
+            ),
+            SizedBox(height: AppConstants.spacingMedium),
+            
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatCard(
+                    'Totale Vinili',
+                    provider.totalVinyls.toString(),
+                    Icons.album,
+                    AppConstants.primaryColor,
+                  ),
+                ),
+                SizedBox(width: AppConstants.spacingMedium),
+                Expanded(
+                  child: _buildStatCard(
+                    'Preferiti',
+                    provider.favoriteCount.toString(),
+                    Icons.favorite,
+                    Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // === SECTION HEADER: Widget intestazione sezione ===
+  Widget _buildSectionHeader(String title, IconData icon, {VoidCallback? onTap}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Icon(
+              icon,
+              color: AppConstants.primaryColor,
+              size: 24,
+            ),
+            SizedBox(width: AppConstants.spacingSmall),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppConstants.primaryColor,
+              ),
+            ),
+          ],
+        ),
+        if (onTap != null)
+          GestureDetector(
+            onTap: onTap,
+            child: Container(
+              padding: EdgeInsets.all(4),
+              child: Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.grey[600],
+                size: 16,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+  
+  // === VINYL CARD: Widget card vinile ===
+  Widget _buildVinylCard(vinyl, BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        // NAVIGATION: Naviga alla modifica vinile
+        final scaffoldMessenger = ScaffoldMessenger.of(context);
+        final result = await Navigator.push(
           context,
-          '/searchView',
-        ), //per ora! deve portare all'aggiungi elemento
-        child: Icon(Icons.add),
+          MaterialPageRoute(
+            builder: (context) => AddEditVinylScreen(vinyl: vinyl),
+          ),
+        );
+        
+        if (result == true && mounted) {
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text('Vinile modificato con successo!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      },
+      child: Container(
+        width: 120,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // IMAGE: Immagine copertina
+            Container(
+              height: 100,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppConstants.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(AppConstants.borderRadius),
+                ),
+              ),
+              child: vinyl.imagePath != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(AppConstants.borderRadius),
+                      ),
+                      child: Image.file(
+                        File(vinyl.imagePath!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return _buildImagePlaceholder();
+                        },
+                      ),
+                    )
+                  : _buildImagePlaceholder(),
+            ),
+            
+            // INFO: Informazioni vinile
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(AppConstants.paddingSmall),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      vinyl.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      vinyl.artist,
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 10,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Spacer(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          vinyl.year.toString(),
+                          style: TextStyle(
+                            color: AppConstants.primaryColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (vinyl.isFavorite)
+                          Icon(
+                            Icons.favorite,
+                            color: Colors.red,
+                            size: 12,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // === IMAGE PLACEHOLDER: Placeholder per immagine ===
+  Widget _buildImagePlaceholder() {
+    return Center(
+      child: Icon(
+        Icons.album,
+        color: AppConstants.primaryColor.withValues(alpha: 0.5),
+        size: 40,
+      ),
+    );
+  }
+  
+  // === EMPTY STATE: Widget stato vuoto ===
+  Widget _buildEmptyState(String title, String subtitle, IconData icon) {
+    return SizedBox(
+      height: 120,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: Colors.grey[400],
+              size: 48,
+            ),
+            SizedBox(height: AppConstants.spacingSmall),
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[600],
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // === STAT CARD: Widget card statistica ===
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 32,
+          ),
+          SizedBox(height: AppConstants.spacingSmall),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+

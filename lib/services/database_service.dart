@@ -1,8 +1,13 @@
 // === IMPORTAZIONI NECESSARIE ===
 // sqflite: Plugin Flutter per database SQLite locale
 import 'package:sqflite/sqflite.dart';
+// sqflite_common_ffi: Supporto per desktop
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+// sqflite_common_ffi_web: Supporto specifico per web
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 // path: Utility per manipolare percorsi di file in modo cross-platform
 import 'package:path/path.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/vinyl.dart';
 import '../models/category.dart' as models;
 import '../utils/constants.dart';
@@ -41,6 +46,12 @@ class DatabaseService {
   // Metodo privato per inizializzare il database
   // ASYNC: Le operazioni di file system sono asincrone per non bloccare l'UI
   Future<Database> _initDatabase() async {
+    // Inizializza il database factory per web/desktop se necessario
+    if (kIsWeb) {
+      // Per il web, usa sqflite_common_ffi_web
+      databaseFactory = databaseFactoryFfiWeb;
+    }
+    
     // JOIN: Combina il percorso della directory database con il nome del file
     // MOTIVO JOIN: Gestisce automaticamente i separatori di percorso (/ o \) per ogni OS
     // AWAIT: getDatabasesPath() è asincrono perché accede al file system

@@ -1,178 +1,261 @@
+// === PATTERN ARCHITETTURALE: DEPENDENCY INJECTION + STATE MANAGEMENT ===
+//
+// MOTIVAZIONE: Questo file implementa il pattern "Dependency Injection" a livello root
+// per fornire il VinylProvider a tutta l'applicazione attraverso l'albero dei widget.
+//
+// VANTAGGI DEL PATTERN PROVIDER A LIVELLO ROOT:
+// 1. SINGLE SOURCE OF TRUTH: Un'unica istanza del provider per tutta l'app
+// 2. AUTOMATIC DISPOSAL: Flutter gestisce automaticamente il cleanup del provider
+// 3. PERFORMANCE: Evita ricreazioni multiple del provider
+// 4. ACCESSIBILITY: Tutti i widget figli possono accedere al provider
+// 5. TESTABILITY: Facilita l'injection di mock provider nei test
+//
+// PATTERN IMPLEMENTATI:
+// - Dependency Injection Pattern: Provider iniettato a livello root
+// - Observer Pattern: ChangeNotifierProvider per notifiche automatiche
+// - Singleton Pattern: Una sola istanza di VinylProvider per l'intera app
+// - Factory Pattern: create() function per istanziazione lazy del provider
+
 // Import delle librerie Flutter necessarie per l'interfaccia utente
+// CORE FRAMEWORK: Widgets, Material Design, rendering engine
 import 'package:flutter/material.dart';
+
 // Import del package Provider per la gestione dello stato dell'applicazione
+// STATE MANAGEMENT: Implementa pattern Observer per reattività UI
+// DEPENDENCY: provider ^6.0.0 (gestione stato reattiva)
 import 'package:provider/provider.dart';
+
 // Import del nostro provider personalizzato per la gestione dei dati dei vinili
+// BUSINESS LOGIC: Centralizza logica applicativa e stato globale
 import 'services/vinyl_provider.dart';
+
 // Import delle costanti dell'applicazione (colori, dimensioni, stringhe)
+// DESIGN SYSTEM: Centralizza valori di design per consistenza UI
 import 'utils/constants.dart';
 
-// Funzione main: punto di ingresso dell'applicazione Flutter
+// Import della schermata principale con navigazione
+import 'schermata_principale.dart';
+
+// === ENTRY POINT: BOOTSTRAP DELL'APPLICAZIONE ===
+// PATTERN: Application Bootstrap con configurazione centralizzata
+// MOTIVAZIONE: Punto di ingresso unico per inizializzazione e configurazione
 void main() {
-  // Avvia l'applicazione Flutter con il widget root VinylCollectionApp
+  // FRAMEWORK INITIALIZATION: Avvia il framework Flutter
+  // WIDGET TREE: Costruisce l'albero dei widget partendo da VinylCollectionApp
   runApp(const VinylCollectionApp());
 }
 
-// Widget principale dell'applicazione - estende StatelessWidget perché non ha stato interno
+// === ROOT WIDGET: CONFIGURAZIONE ARCHITETTURALE ===
+// PATTERN: Root Configuration Widget
+// MOTIVAZIONE: Centralizza configurazione tema, provider e routing
+// PERFORMANCE: StatelessWidget per evitare rebuild inutili del root
 class VinylCollectionApp extends StatelessWidget {
-  // Costruttore const per ottimizzazioni delle performance
+  // IMMUTABILITY: Costruttore const per ottimizzazioni compile-time
+  // PERFORMANCE: Permette a Flutter di riutilizzare l'istanza del widget
   const VinylCollectionApp({super.key});
 
-  // Metodo build: definisce la struttura dell'interfaccia utente
+  // === UI BUILDER: COSTRUZIONE ALBERO WIDGET ===
+  // PATTERN: Builder Pattern per costruzione incrementale UI
   @override
   Widget build(BuildContext context) {
-    // ChangeNotifierProvider: fornisce il VinylProvider a tutti i widget figli
-    // Questo permette la gestione centralizzata dello stato dell'applicazione
+    // === DEPENDENCY INJECTION LAYER ===
+    // PATTERN: Provider Pattern per Dependency Injection
+    // SCOPE: Application-wide scope per stato globale
+    // LIFECYCLE: Provider gestito automaticamente da Flutter
     return ChangeNotifierProvider(
-      // create: crea una nuova istanza di VinylProvider e la inizializza
-      // L'operatore .. (cascade) permette di chiamare initialize() sull'istanza appena creata
+      // === FACTORY PATTERN: LAZY INITIALIZATION ===
+      // PATTERN: Factory Method per creazione controllata istanze
+      // LAZY LOADING: Provider creato solo quando necessario
+      // CASCADE OPERATOR: ..initialize() per chiamata fluent
       create: (context) => VinylProvider()..initialize(),
-      // child: definisce l'app Flutter vera e propria
+      
+      // === MATERIAL APP: CONFIGURAZIONE FRAMEWORK ===
+      // PATTERN: Configuration Object per setup applicazione
       child: MaterialApp(
-        // Titolo dell'applicazione (visibile nel task manager e nelle impostazioni)
+        // === METADATA CONFIGURATION ===
+        // APP IDENTITY: Identificazione applicazione per sistema operativo
         title: AppConstants.appName,
-        // Nasconde il banner "DEBUG" nell'angolo in alto a destra durante lo sviluppo
+        
+        // === DEVELOPMENT CONFIGURATION ===
+        // DEBUG OPTIMIZATION: Rimuove banner debug in development
+        // PRODUCTION: Automaticamente false in release build
         debugShowCheckedModeBanner: false,
-        // Configurazione del tema dell'applicazione per un design consistente
+        
+        // === DESIGN SYSTEM: THEME CONFIGURATION ===
+        // PATTERN: Theme Configuration Pattern
+        // MOTIVAZIONE: Centralizza stili per consistenza UI globale
         theme: ThemeData(
-          // Colore primario del Material Design (palette di colori predefinita)
+          // === COLOR SYSTEM: MATERIAL DESIGN 3 ===
+          // LEGACY SUPPORT: primarySwatch per compatibilità Material 2
           primarySwatch: Colors.deepPurple,
-          // Colore primario personalizzato definito nelle nostre costanti
+          
+          // CUSTOM BRANDING: Colore primario personalizzato
           primaryColor: AppConstants.primaryColor,
-          // Schema di colori generato automaticamente dal colore primario
-          // Crea una palette completa di colori complementari
+          
+          // === DYNAMIC COLOR SCHEME ===
+          // PATTERN: Seed-based Color Generation
+          // ALGORITHM: Genera palette completa da colore seed
+          // ACCESSIBILITY: Contrasti automatici per accessibilità
           colorScheme: ColorScheme.fromSeed(
             seedColor: AppConstants.primaryColor,
-            brightness: Brightness.light, // Tema chiaro
+            brightness: Brightness.light, // Light theme configuration
           ),
-          // Tema personalizzato per tutte le AppBar dell'applicazione
+          
+          // === COMPONENT THEMES: DESIGN TOKENS ===
+          // PATTERN: Component-specific Theme Configuration
+          
+          // APP BAR THEME: Configurazione barre superiori
           appBarTheme: const AppBarTheme(
-            backgroundColor: AppConstants.primaryColor, // Colore di sfondo
-            foregroundColor: Colors.white, // Colore del testo e delle icone
-            elevation: 0, // Rimuove l'ombra per un design più moderno
+            backgroundColor: AppConstants.primaryColor,
+            foregroundColor: Colors.white, // Testo e icone
+            elevation: 0, // Flat design - no shadow
           ),
-          // Tema personalizzato per tutte le Card dell'applicazione
+          
+          // CARD THEME: Configurazione componenti card
           cardTheme: CardThemeData(
-            elevation: AppConstants.cardElevation, // Altezza dell'ombra delle card
-            // Forma delle card con bordi arrotondati
+            elevation: AppConstants.cardElevation, // Material elevation
+            // SHAPE: Bordi arrotondati per design moderno
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConstants.borderRadius),
             ),
           ),
-          // Tema personalizzato per tutti i campi di input (TextField, TextFormField)
+          
+          // INPUT THEME: Configurazione campi di input
           inputDecorationTheme: InputDecorationTheme(
-            // Bordo con outline e angoli arrotondati
+            // BORDER STYLE: Outline border per chiarezza visiva
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppConstants.borderRadius),
             ),
-            filled: true, // Abilita il riempimento del background
-            fillColor: Colors.grey[50], // Colore di sfondo molto chiaro
+            filled: true, // Background fill per migliore leggibilità
+            fillColor: Colors.grey[50], // Subtle background color
           ),
-          // Tema personalizzato per tutti i pulsanti ElevatedButton
+          
+          // BUTTON THEME: Configurazione pulsanti elevati
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primaryColor, // Colore di sfondo
-              foregroundColor: Colors.white, // Colore del testo
-              // Forma del pulsante con bordi arrotondati
+              backgroundColor: AppConstants.primaryColor,
+              foregroundColor: Colors.white,
+              // SHAPE: Consistenza con altri componenti
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadius),
               ),
-              // Padding interno del pulsante per una migliore usabilità
+              // PADDING: Touch target optimization per usabilità
               padding: const EdgeInsets.symmetric(
-                horizontal: AppConstants.paddingMedium, // Padding orizzontale
-                vertical: AppConstants.paddingSmall, // Padding verticale
+                horizontal: AppConstants.paddingMedium,
+                vertical: AppConstants.paddingSmall,
               ),
             ),
           ),
         ),
-        // Schermata iniziale dell'applicazione: mostra la SplashScreen
+        
+        // === INITIAL ROUTE: NAVIGATION BOOTSTRAP ===
+        // PATTERN: Initial Screen Pattern
+        // UX: Splash screen per perceived performance
         home: const SplashScreen(),
       ),
     );
   }
 }
 
-// SplashScreen: schermata di caricamento mostrata all'avvio dell'app
-// Estende StatefulWidget perché deve gestire la navigazione temporizzata
+// === SPLASH SCREEN: LOADING & INITIALIZATION ===
+// PATTERN: Splash Screen Pattern per UX ottimizzata
+// MOTIVAZIONE: Maschera tempo di inizializzazione e migliora perceived performance
+// LIFECYCLE: StatefulWidget per gestione navigazione temporizzata
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
-  // Crea lo stato associato al widget
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-// Classe di stato per SplashScreen - gestisce il ciclo di vita e la logica
+// === SPLASH STATE: LIFECYCLE MANAGEMENT ===
+// PATTERN: State Management per operazioni asincrone
 class _SplashScreenState extends State<SplashScreen> {
-  // initState: chiamato una sola volta quando il widget viene creato
+  // === INITIALIZATION HOOK ===
+  // LIFECYCLE: Chiamato una sola volta alla creazione del widget
+  // TIMING: Ideale per setup iniziale e operazioni one-time
   @override
   void initState() {
-    super.initState(); // Chiama il metodo della classe padre
-    _navigateToHome(); // Avvia il timer per la navigazione
+    super.initState(); // REQUIRED: Chiamata al parent per corretto lifecycle
+    _navigateToHome(); // ASYNC: Avvia timer navigazione
   }
 
-  // Metodo privato per gestire la navigazione temporizzata alla home
+  // === NAVIGATION STRATEGY: DELAYED TRANSITION ===
+  // PATTERN: Timed Navigation Pattern
+  // UX: Permette visualizzazione logo e caricamento perceived
+  // ERROR HANDLING: Verifica mounted state per prevenire memory leaks
   _navigateToHome() async {
-    // Aspetta 2 secondi prima di procedere (simula caricamento)
+    // DELAY: Simula caricamento e permette visualizzazione splash
+    // TIMING: 2 secondi ottimali per branding senza frustrazione utente
     await Future.delayed(const Duration(seconds: 2));
-    // Verifica che il widget sia ancora montato prima di navigare
-    // Questo previene errori se l'utente esce dall'app durante il caricamento
+    
+    // SAFETY CHECK: Verifica che widget sia ancora nell'albero
+    // MEMORY LEAK PREVENTION: Evita navigazione su widget dismesso
     if (mounted) {
-      // Naviga alla HomeScreen sostituendo la SplashScreen nello stack
-      // pushReplacement rimuove la splash screen dalla cronologia
+      // NAVIGATION: Sostituzione completa dello stack
+      // PATTERN: Replace Navigation per prevenire back alla splash
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => const SchermataP()),
       );
     }
   }
 
-  // build: costruisce l'interfaccia utente della splash screen
+  // === SPLASH UI: BRANDING & LOADING ===
+  // PATTERN: Centered Loading UI Pattern
+  // DESIGN: Branding prominente con feedback di caricamento
   @override
   Widget build(BuildContext context) {
-    // Scaffold: struttura base della schermata con background e body
     return Scaffold(
-      // Sfondo con il colore primario dell'app
+      // BRANDING: Background con colore primario per impatto visivo
       backgroundColor: AppConstants.primaryColor,
-      // Body centrato per posizionare il contenuto al centro dello schermo
+      
+      // LAYOUT: Centrato per focus su branding
       body: const Center(
-        // Column: dispone i widget verticalmente
         child: Column(
-          // Centra i widget verticalmente nello spazio disponibile
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Icona del vinile come logo dell'app
+            // === BRAND ICON: VISUAL IDENTITY ===
+            // ICONOGRAPHY: Album icon per immediate riconoscimento app
             Icon(
-              Icons.album, // Icona Material Design per album/vinile
-              size: 100, // Dimensione grande per impatto visivo
-              color: Colors.white, // Colore bianco per contrasto
+              Icons.album, // Material Design icon semanticamente appropriata
+              size: 100, // Large size per impatto visivo
+              color: Colors.white, // High contrast su background primario
             ),
-            // Spazio verticale tra icona e titolo
+            
+            // SPACING: Consistent spacing usando design tokens
             SizedBox(height: AppConstants.spacingMedium),
-            // Titolo principale dell'applicazione
+            
+            // === BRAND NAME: TYPOGRAPHY HIERARCHY ===
+            // PRIMARY TEXT: Nome app con massima prominenza
             Text(
-              AppConstants.appName, // Nome dell'app dalle costanti
+              AppConstants.appName,
               style: TextStyle(
-                fontSize: 28, // Font grande per il titolo
-                fontWeight: FontWeight.bold, // Testo in grassetto
-                color: Colors.white, // Colore bianco
+                fontSize: 28, // Large font per hierarchy
+                fontWeight: FontWeight.bold, // Bold per emphasis
+                color: Colors.white, // High contrast
               ),
             ),
-            // Spazio più piccolo tra titolo e sottotitolo
+            
             SizedBox(height: AppConstants.spacingSmall),
-            // Sottotitolo descrittivo
+            
+            // === TAGLINE: SECONDARY INFORMATION ===
+            // DESCRIPTIVE TEXT: Chiarisce purpose dell'app
             Text(
-              'La tua collezione di vinili', // Descrizione dell'app
+              'La tua collezione di vinili',
               style: TextStyle(
-                fontSize: 16, // Font più piccolo del titolo
-                color: Colors.white70, // Bianco semi-trasparente
+                fontSize: 16, // Smaller font per hierarchy
+                color: Colors.white70, // Reduced opacity per secondary info
               ),
             ),
-            // Spazio più grande prima dell'indicatore di caricamento
+            
             SizedBox(height: AppConstants.spacingLarge),
-            // Indicatore di caricamento circolare per mostrare l'attività
+            
+            // === LOADING INDICATOR: USER FEEDBACK ===
+            // PROGRESS: Indica attività in corso
+            // UX: Rassicura utente che app sta caricando
             CircularProgressIndicator(
-              color: Colors.white, // Colore bianco per contrasto
+              color: Colors.white, // Consistent con color scheme
             ),
           ],
         ),
@@ -181,55 +264,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// HomeScreen: schermata principale placeholder per la Fase 1
-// Sarà completamente implementata nella Fase 2 con le funzionalità reali
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  // build: costruisce l'interfaccia placeholder della home
-  @override
-  Widget build(BuildContext context) {
-    // Scaffold con AppBar e contenuto centrato
-    return Scaffold(
-      // AppBar con il titolo dell'applicazione
-      appBar: AppBar(
-        title: const Text(AppConstants.appName),
-      ),
-      // Body con messaggio di benvenuto centrato
-      body: const Center(
-        // Column per disporre i widget verticalmente
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Icona del vinile più piccola rispetto alla splash
-            Icon(
-              Icons.album,
-              size: 80, // Dimensione ridotta per la home
-              color: AppConstants.primaryColor, // Colore primario
-            ),
-            // Spazio tra icona e testo
-            SizedBox(height: AppConstants.spacingMedium),
-            // Messaggio di benvenuto principale
-            Text(
-              'Benvenuto nella tua collezione!',
-              style: TextStyle(
-                fontSize: 20, // Font medio per il messaggio
-                fontWeight: FontWeight.bold, // Testo in grassetto
-              ),
-            ),
-            // Spazio più piccolo tra messaggio principale e nota
-            SizedBox(height: AppConstants.spacingSmall),
-            // Nota informativa sullo stato di sviluppo
-            Text(
-              'Le schermate saranno implementate nella Fase 2',
-              style: TextStyle(
-                fontSize: 16, // Font più piccolo per la nota
-                color: Colors.grey, // Colore grigio per indicare info secondaria
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// === NOTA: HOME SCREEN RIMOSSA ===
+// La HomeScreen placeholder è stata sostituita con SchermataP
+// che include la navigazione completa con HomeView, SearchView e AnalisiView

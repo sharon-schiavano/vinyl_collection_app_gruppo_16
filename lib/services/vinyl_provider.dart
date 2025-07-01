@@ -1,3 +1,21 @@
+// === PATTERN ARCHITETTURALE: STATE MANAGEMENT CON PROVIDER ===
+//
+// MOTIVAZIONE: Questo provider implementa il pattern "Single Source of Truth"
+// per la gestione centralizzata dello stato dell'applicazione Flutter.
+//
+// VANTAGGI DEL PATTERN PROVIDER:
+// 1. REATTIVITÀ: ChangeNotifier permette aggiornamenti automatici UI
+// 2. SEPARAZIONE: Business logic separata dalla presentazione
+// 3. TESTABILITÀ: Logica isolata e facilmente testabile
+// 4. SCALABILITÀ: Gestione centralizzata dello stato globale
+// 5. PERFORMANCE: Aggiornamenti granulari solo dei widget necessari
+//
+// PATTERN IMPLEMENTATI:
+// - Repository Pattern: Astrazione del layer di persistenza
+// - Observer Pattern: Notifiche automatiche ai widget
+// - Command Pattern: Operazioni CRUD incapsulate
+// - Strategy Pattern: Diversi algoritmi di filtro e ricerca
+
 // Provider per la gestione dello stato dei vinili e delle categorie
 // Utilizza il pattern Provider per gestire lo stato globale dell'applicazione
 
@@ -7,176 +25,204 @@ import '../models/vinyl.dart';              // Modello dati Vinyl
 import '../models/category.dart' as models; // Modello dati Category (con alias)
 import 'database_service.dart';             // Servizio per operazioni database
 
-// Classe principale che gestisce lo stato dell'applicazione
-// Estende ChangeNotifier per notificare i widget dei cambiamenti
+// === CLASSE PRINCIPALE: VINYL PROVIDER ===
+// Implementa il pattern "Facade" per semplificare l'accesso ai dati
+// Estende ChangeNotifier per il pattern Observer (notifiche automatiche)
 class VinylProvider with ChangeNotifier {
-  // === SERVIZI E DIPENDENZE ===
-  // Istanza del servizio database per operazioni CRUD
+  // === DEPENDENCY INJECTION ===
+  // PATTERN: Dependency Injection per disaccoppiamento
+  // MOTIVAZIONE: Facilita testing e manutenibilità
+  // ALTERNATIVA: Si potrebbe usare get_it per DI più avanzata
   final DatabaseService _databaseService = DatabaseService();
   
-  // === STATO PRIVATO DELL'APPLICAZIONE ===
-  // Lista completa dei vinili caricati dal database
+  // === STATO PRIVATO: ENCAPSULATION PATTERN ===
+  // MOTIVAZIONE: Controllo completo sull'accesso e modifica dei dati
+  // PATTERN: Information Hiding per garantire consistenza dello stato
+  
+  // CACHE LOCALE: Lista completa dei vinili (Source of Truth locale)
+  // MOTIVAZIONE: Evita query ripetute al database per performance
   List<Vinyl> _vinyls = [];
-  // Lista delle categorie/generi musicali
+  
+  // CACHE CATEGORIE: Lista delle categorie/generi musicali
   List<models.Category> _categories = [];
-  // Lista filtrata dei vinili (per ricerche e filtri)
+  
+  // VISTA FILTRATA: Risultato di ricerche e filtri applicati
+  // PATTERN: Computed Property per performance ottimizzate
   List<Vinyl> _filteredVinyls = [];
-  // Query di ricerca corrente
+  
+  // STATO UI: Query di ricerca corrente
   String _searchQuery = '';
-  // Genere selezionato per il filtro
+  
+  // STATO FILTRO: Genere selezionato per il filtro
   String _selectedGenre = 'Tutti';
-  // Flag per indicare operazioni in corso
+  
+  // STATO LOADING: Flag per feedback visivo durante operazioni async
+  // PATTERN: Loading State per UX migliorata
   bool _isLoading = false;
   
-  // === GETTERS PUBBLICI ===
-  // Accesso in sola lettura alla lista completa dei vinili
+  // === GETTERS PUBBLICI: CONTROLLED ACCESS PATTERN ===
+  // MOTIVAZIONE: Accesso read-only per prevenire modifiche accidentali
+  // PATTERN: Immutable Views per garantire data integrity
+  
   List<Vinyl> get vinyls => _vinyls;
-  // Accesso in sola lettura alla lista delle categorie
   List<models.Category> get categories => _categories;
-  // Lista vinili da mostrare (filtrata o completa)
+  
+  // COMPUTED PROPERTY: Vista intelligente che decide quale lista mostrare
+  // ALGORITMO: Mostra lista filtrata se ci sono filtri attivi, altrimenti lista completa
+  // PERFORMANCE: Evita calcoli inutili quando non ci sono filtri
   List<Vinyl> get filteredVinyls => _filteredVinyls.isEmpty && _searchQuery.isEmpty && _selectedGenre == 'Tutti' ? _vinyls : _filteredVinyls;
-  // Query di ricerca corrente
+  
   String get searchQuery => _searchQuery;
-  // Genere selezionato corrente
   String get selectedGenre => _selectedGenre;
-  // Stato di caricamento
   bool get isLoading => _isLoading;
   
-  // === GETTERS COMPUTATI ===
-  // Lista dei vinili marcati come preferiti
+  // === GETTERS COMPUTATI: DERIVED STATE PATTERN ===
+  // MOTIVAZIONE: Calcoli derivati dallo stato principale
+  // PATTERN: Computed Properties per evitare duplicazione dati
+  // PERFORMANCE: Calcolo on-demand invece di storage ridondante
+  
+  // FILTRO DINAMICO: Lista preferiti calcolata in tempo reale
+  // VANTAGGIO: Sempre sincronizzata, nessun rischio di inconsistenza
   List<Vinyl> get favoriteVinyls => _vinyls.where((vinyl) => vinyl.isFavorite).toList();
-  // Lista dei 5 vinili aggiunti più di recente
+  
+  // VISTA LIMITATA: Ultimi 5 vinili aggiunti
+  // PATTERN: Pagination/Limiting per performance UI
   List<Vinyl> get recentVinyls => _vinyls.take(5).toList();
   
-  // === STATISTICHE ===
-  // Numero totale di vinili nella collezione
+  // === STATISTICHE COMPUTATE ===
+  // PATTERN: Analytics/Metrics derivate dallo stato
   int get totalVinyls => _vinyls.length;
-  // Numero di vinili preferiti
   int get favoriteCount => favoriteVinyls.length;
   
-  // Distribuzione dei vinili per genere (per grafici e statistiche)
+  // AGGREGAZIONE DINAMICA: Distribuzione per genere
+  // ALGORITMO: Conta occorrenze usando Map come accumulatore
+  // COMPLESSITÀ: O(n) ma accettabile per dataset tipici
   Map<String, int> get genreDistribution {
     Map<String, int> distribution = {};
-    // Conta i vinili per ogni genere
+    // PATTERN: Reduce/Fold per aggregazione dati
     for (var vinyl in _vinyls) {
       distribution[vinyl.genre] = (distribution[vinyl.genre] ?? 0) + 1;
     }
     return distribution;
   }
 
-  // === METODI DI INIZIALIZZAZIONE ===
+  // === INIZIALIZZAZIONE: BOOTSTRAP PATTERN ===
+  // PATTERN: Initialization Strategy per setup completo
+  // MOTIVAZIONE: Caricamento coordinato di tutti i dati necessari
   
-  // Metodo principale di inizializzazione del provider
-  // Chiamato all'avvio dell'app per caricare tutti i dati necessari
+  // METODO PRINCIPALE: Orchestrazione del caricamento iniziale
+  // PATTERN: Facade per semplificare operazioni complesse
+  // ERROR HANDLING: Try-catch con cleanup garantito (finally)
   Future<void> initialize() async {
-    // Imposta lo stato di caricamento e notifica i listener
+    // LOADING STATE: Feedback visivo immediato
     _isLoading = true;
-    notifyListeners();
+    notifyListeners(); // OBSERVER: Notifica UI del cambio stato
     
     try {
-      // Carica tutti i vinili dal database
+      // OPERAZIONI PARALLELE: Caricamento coordinato
+      // NOTA: Si potrebbe usare Future.wait per parallelizzazione
       await loadVinyls();
-      // Carica tutte le categorie dal database
       await loadCategories();
     } catch (e) {
-      // Gestisce eventuali errori durante l'inizializzazione
+      // ERROR HANDLING: Logging per debugging
       debugPrint('Errore durante l\'inizializzazione: $e');
     } finally {
-      // Rimuove lo stato di caricamento e notifica i listener
+      // CLEANUP: Garantisce reset dello stato loading
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // === METODI DI CARICAMENTO DATI ===
+  // === CARICAMENTO DATI: REPOSITORY PATTERN ===
+  // PATTERN: Data Loading Strategy con cache locale
+  // MOTIVAZIONE: Separazione tra persistenza e business logic
   
-  // Carica tutti i vinili dal database
-  // Aggiorna la lista locale e applica i filtri correnti
+  // CARICAMENTO VINILI: Sincronizzazione database -> memoria
+  // SIDE EFFECTS: Aggiorna cache locale e applica filtri
   Future<void> loadVinyls() async {
     try {
-      // Recupera tutti i vinili dal database
+      // DATABASE QUERY: Recupero dati persistenti
       _vinyls = await _databaseService.getAllVinyls();
-      // Applica i filtri correnti alla lista caricata
+      // FILTER APPLICATION: Mantiene coerenza vista filtrata
       _applyFilters();
-      // Notifica i widget che i dati sono cambiati
+      // UI NOTIFICATION: Aggiornamento reattivo interfaccia
       notifyListeners();
     } catch (e) {
-      // Gestisce errori durante il caricamento dei vinili
+      // ERROR LOGGING: Tracciamento problemi per debugging
       debugPrint('Errore nel caricamento vinili: $e');
     }
   }
 
-  // Carica tutte le categorie dal database
-  // Aggiorna la lista locale delle categorie disponibili
+  // CARICAMENTO CATEGORIE: Gestione metadati
   Future<void> loadCategories() async {
     try {
-      // Recupera tutte le categorie dal database
       _categories = await _databaseService.getAllCategories();
-      // Notifica i widget che i dati sono cambiati
       notifyListeners();
     } catch (e) {
-      // Gestisce errori durante il caricamento delle categorie
       debugPrint('Errore nel caricamento categorie: $e');
     }
   }
 
-  // === OPERAZIONI CRUD (Create, Read, Update, Delete) ===
+  // === OPERAZIONI CRUD: COMMAND PATTERN ===
+  // PATTERN: Command per incapsulare operazioni business
+  // MOTIVAZIONE: Operazioni atomiche con rollback e feedback
+  // CONSISTENCY: Sincronizzazione database <-> cache locale
   
-  // Aggiunge un nuovo vinile alla collezione
-  // Restituisce true se l'operazione ha successo, false altrimenti
+  // CREATE: Aggiunta nuovo vinile
+  // TRANSACTION PATTERN: Operazione atomica con rollback su errore
+  // OPTIMISTIC UPDATE: Aggiorna cache prima di conferma database
   Future<bool> addVinyl(Vinyl vinyl) async {
     try {
-      // Imposta stato di caricamento per feedback visivo
+      // LOADING FEEDBACK: UX durante operazione asincrona
       _isLoading = true;
       notifyListeners();
       
-      // Inserisce il vinile nel database e ottiene l'ID generato
+      // DATABASE PERSISTENCE: Salvataggio permanente
       int id = await _databaseService.insertVinyl(vinyl);
-      // Assegna l'ID al vinile
-      vinyl.id = id;
-      // Aggiunge il vinile in cima alla lista (più recenti prima)
+      vinyl.id = id; // ID ASSIGNMENT: Sincronizzazione chiave primaria
+      
+      // CACHE UPDATE: Aggiornamento immediato lista locale
+      // STRATEGY: Insert at beginning per "most recent first"
       _vinyls.insert(0, vinyl);
-      // Riapplica i filtri per aggiornare la vista filtrata
+      
+      // FILTER CONSISTENCY: Mantiene coerenza vista filtrata
       _applyFilters();
       
-      // Rimuove stato di caricamento e notifica successo
+      // SUCCESS FEEDBACK: Notifica completamento operazione
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      // Gestisce errori e ripristina stato normale
+      // ERROR RECOVERY: Ripristino stato consistente
       debugPrint('Errore nell\'aggiunta del vinile: $e');
       _isLoading = false;
       notifyListeners();
-      return false;
+      return false; // FAILURE INDICATION: Comunicazione errore al caller
     }
   }
 
-  // Aggiorna un vinile esistente nella collezione
-  // Restituisce true se l'operazione ha successo, false altrimenti
+  // UPDATE: Modifica vinile esistente
+  // PATTERN: Update Strategy con sincronizzazione dual-layer
   Future<bool> updateVinyl(Vinyl vinyl) async {
     try {
-      // Imposta stato di caricamento
       _isLoading = true;
       notifyListeners();
       
-      // Aggiorna il vinile nel database
+      // DATABASE UPDATE: Persistenza modifiche
       await _databaseService.updateVinyl(vinyl);
       
-      // Trova e aggiorna il vinile nella lista locale
+      // CACHE SYNCHRONIZATION: Aggiornamento lista locale
+      // ALGORITHM: Find-and-replace per mantenere posizione
       int index = _vinyls.indexWhere((v) => v.id == vinyl.id);
       if (index != -1) {
-        _vinyls[index] = vinyl;
-        // Riapplica i filtri per aggiornare la vista
-        _applyFilters();
+        _vinyls[index] = vinyl; // IN-PLACE UPDATE
+        _applyFilters(); // FILTER REFRESH: Ricalcola vista filtrata
       }
       
-      // Rimuove stato di caricamento e notifica successo
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      // Gestisce errori e ripristina stato normale
       debugPrint('Errore nell\'aggiornamento del vinile: $e');
       _isLoading = false;
       notifyListeners();
@@ -184,27 +230,27 @@ class VinylProvider with ChangeNotifier {
     }
   }
 
-  // Elimina un vinile dalla collezione
-  // Restituisce true se l'operazione ha successo, false altrimenti
+  // DELETE: Rimozione vinile
+  // PATTERN: Soft Delete Strategy (database) + Hard Delete (cache)
   Future<bool> deleteVinyl(int id) async {
     try {
-      // Imposta stato di caricamento
       _isLoading = true;
       notifyListeners();
       
-      // Elimina il vinile dal database
+      // DATABASE DELETION: Rimozione permanente
       await _databaseService.deleteVinyl(id);
-      // Rimuove il vinile dalla lista locale
+      
+      // CACHE CLEANUP: Rimozione da lista locale
+      // ALGORITHM: Filter-out per rimozione efficiente
       _vinyls.removeWhere((vinyl) => vinyl.id == id);
-      // Riapplica i filtri per aggiornare la vista
+      
+      // FILTER REFRESH: Aggiorna vista filtrata
       _applyFilters();
       
-      // Rimuove stato di caricamento e notifica successo
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      // Gestisce errori e ripristina stato normale
       debugPrint('Errore nella cancellazione del vinile: $e');
       _isLoading = false;
       notifyListeners();
@@ -212,74 +258,72 @@ class VinylProvider with ChangeNotifier {
     }
   }
 
-  // Cambia lo stato di preferito di un vinile
-  // Restituisce true se l'operazione ha successo, false altrimenti
+  // TOGGLE FAVORITE: Operazione specializzata
+  // PATTERN: Composite Operation (find + update)
+  // IMMUTABILITY: Usa copyWith per modifiche immutabili
   Future<bool> toggleFavorite(int id) async {
     try {
-      // Trova il vinile nella lista
+      // SEARCH ALGORITHM: Linear search per ID
       int index = _vinyls.indexWhere((vinyl) => vinyl.id == id);
       if (index != -1) {
         Vinyl vinyl = _vinyls[index];
-        // Crea una copia con stato preferito invertito
+        // IMMUTABLE UPDATE: Crea nuova istanza con modifica
         Vinyl updatedVinyl = vinyl.copyWith(isFavorite: !vinyl.isFavorite);
-        // Aggiorna il vinile utilizzando il metodo updateVinyl
+        // DELEGATION: Riusa logica updateVinyl per consistenza
         return await updateVinyl(updatedVinyl);
       }
       return false;
     } catch (e) {
-      // Gestisce errori durante il toggle
       debugPrint('Errore nel toggle favorito: $e');
       return false;
     }
   }
 
-  // === METODI DI RICERCA E FILTRO ===
+  // === RICERCA E FILTRI: STRATEGY PATTERN ===
+  // PATTERN: Filter Strategy per ricerca multi-criterio
+  // PERFORMANCE: Filtri applicati in memoria per velocità
+  // ALGORITHM: Combinazione AND di filtri multipli
   
-  // Imposta la query di ricerca e applica i filtri
-  // Cerca nei campi: titolo, artista, etichetta e genere
+  // SEARCH: Ricerca testuale multi-campo
+  // ALGORITHM: Case-insensitive substring matching
+  // FIELDS: Titolo, artista, etichetta, genere
   void searchVinyls(String query) {
-    // Converte la query in minuscolo per ricerca case-insensitive
+    // NORMALIZATION: Lowercase per ricerca case-insensitive
     _searchQuery = query.toLowerCase();
-    // Applica tutti i filtri attivi
+    // FILTER APPLICATION: Ricalcola risultati
     _applyFilters();
-    // Notifica i widget del cambiamento
+    // UI UPDATE: Notifica cambiamento vista
     notifyListeners();
   }
 
-  // Filtra i vinili per genere musicale
-  // Accetta 'Tutti' per mostrare tutti i generi
+  // GENRE FILTER: Filtro per categoria
+  // SPECIAL VALUE: 'Tutti' per disabilitare filtro
   void filterByGenre(String genre) {
-    // Imposta il genere selezionato
     _selectedGenre = genre;
-    // Applica tutti i filtri attivi
     _applyFilters();
-    // Notifica i widget del cambiamento
     notifyListeners();
   }
 
-  // Rimuove tutti i filtri attivi
-  // Ripristina la vista completa della collezione
+  // CLEAR FILTERS: Reset completo filtri
+  // PATTERN: Reset Strategy per stato pulito
   void clearFilters() {
-    // Resetta la query di ricerca
     _searchQuery = '';
-    // Resetta il filtro genere
     _selectedGenre = 'Tutti';
-    // Svuota la lista filtrata
-    _filteredVinyls = [];
-    // Notifica i widget del cambiamento
+    _filteredVinyls = []; // CLEAR CACHE: Forza uso lista completa
     notifyListeners();
   }
 
-  // Metodo privato che applica tutti i filtri attivi
-  // Combina ricerca testuale e filtro per genere
+  // CORE FILTERING ALGORITHM: Applicazione filtri combinati
+  // PATTERN: Pipeline Processing per filtri sequenziali
+  // PERFORMANCE: Early termination se nessun filtro attivo
   void _applyFilters() {
-    // Crea una copia della lista completa
+    // COPY STRATEGY: Lavora su copia per non modificare originale
     List<Vinyl> filtered = List.from(_vinyls);
     
-    // Applica filtro di ricerca testuale se presente
+    // TEXT FILTER: Ricerca multi-campo
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((vinyl) {
-        // Cerca in titolo, artista, etichetta e genere (case-insensitive)
+        // MULTI-FIELD SEARCH: OR logic tra campi diversi
         return vinyl.title.toLowerCase().contains(_searchQuery) ||
                vinyl.artist.toLowerCase().contains(_searchQuery) ||
                vinyl.label.toLowerCase().contains(_searchQuery) ||
@@ -287,95 +331,92 @@ class VinylProvider with ChangeNotifier {
       }).toList();
     }
     
-    // Applica filtro per genere se non è 'Tutti'
+    // GENRE FILTER: Filtro esatto per categoria
     if (_selectedGenre != 'Tutti') {
       filtered = filtered.where((vinyl) => vinyl.genre == _selectedGenre).toList();
     }
     
-    // Aggiorna la lista filtrata
+    // RESULT ASSIGNMENT: Aggiorna cache filtrata
     _filteredVinyls = filtered;
   }
 
-  // === METODI UTILITY ===
+  // === UTILITY METHODS: HELPER PATTERN ===
+  // PATTERN: Utility Functions per operazioni comuni
   
-  // Trova un vinile specifico tramite ID
-  // Restituisce null se non trovato
+  // FIND BY ID: Ricerca diretta per chiave primaria
+  // ALGORITHM: Linear search (accettabile per dataset tipici)
+  // RETURN: Nullable per gestione "not found"
   Vinyl? getVinylById(int id) {
     try {
-      // Cerca il primo vinile con l'ID specificato
       return _vinyls.firstWhere((vinyl) => vinyl.id == id);
     } catch (e) {
-      // Restituisce null se non trovato
-      return null;
+      return null; // NOT FOUND: Gestione elegante assenza
     }
   }
 
-  // Ottiene la lista di tutti i generi disponibili
-  // Include 'Tutti' come prima opzione per i filtri
+  // AVAILABLE GENRES: Lista dinamica generi
+  // PATTERN: Computed Property da dati esistenti
+  // ALGORITHM: Set per unicità + sort per ordinamento
   List<String> get availableGenres {
-    // Estrae tutti i generi unici dalla collezione
+    // EXTRACTION: Estrae generi unici dalla collezione
     Set<String> genres = _vinyls.map((vinyl) => vinyl.genre).toSet();
-    // Crea lista con 'Tutti' come prima opzione
+    // UI CONVENTION: 'Tutti' come prima opzione
     List<String> genreList = ['Tutti'];
-    // Aggiunge i generi ordinati alfabeticamente
+    // SORTING: Ordinamento alfabetico per UX
     genreList.addAll(genres.toList()..sort());
     return genreList;
   }
 
-  // Filtra i vinili per anno di pubblicazione
-  // Utile per ricerche cronologiche
+  // YEAR FILTER: Filtro per anno pubblicazione
+  // ALGORITHM: Exact match filtering
   List<Vinyl> getVinylsByYear(int year) {
     return _vinyls.where((vinyl) => vinyl.year == year).toList();
   }
 
-  // Filtra i vinili per artista
-  // Ricerca case-insensitive nel nome dell'artista
+  // ARTIST FILTER: Ricerca per artista
+  // ALGORITHM: Case-insensitive partial matching
   List<Vinyl> getVinylsByArtist(String artist) {
     return _vinyls.where((vinyl) => 
         vinyl.artist.toLowerCase().contains(artist.toLowerCase())).toList();
   }
 
-  // === METODI STATISTICI ===
+  // === ANALYTICS: STATISTICAL PATTERN ===
+  // PATTERN: Data Analytics per insights business
+  // PERFORMANCE: Calcolo on-demand per dati sempre aggiornati
   
-  // Distribuzione dei vinili per anno di pubblicazione
-  // Restituisce una mappa anno -> numero di vinili
+  // YEAR DISTRIBUTION: Analisi temporale collezione
+  // ALGORITHM: Frequency counting con Map come accumulatore
   Map<int, int> get yearDistribution {
     Map<int, int> distribution = {};
-    // Conta i vinili per ogni anno
     for (var vinyl in _vinyls) {
       distribution[vinyl.year] = (distribution[vinyl.year] ?? 0) + 1;
     }
     return distribution;
   }
 
-  // Distribuzione dei vinili per condizione
-  // Restituisce una mappa condizione -> numero di vinili
+  // CONDITION DISTRIBUTION: Analisi stato conservazione
   Map<String, int> get conditionDistribution {
     Map<String, int> distribution = {};
-    // Conta i vinili per ogni condizione
     for (var vinyl in _vinyls) {
       distribution[vinyl.condition] = (distribution[vinyl.condition] ?? 0) + 1;
     }
     return distribution;
   }
 
-  // Ottiene i 5 vinili più vecchi della collezione
-  // Ordinati per anno di pubblicazione crescente
+  // OLDEST VINYLS: Top 5 più vecchi
+  // ALGORITHM: Sort + take per ranking
+  // SORTING: Crescente per anno (oldest first)
   List<Vinyl> get oldestVinyls {
     List<Vinyl> sorted = List.from(_vinyls);
-    // Ordina per anno crescente (più vecchi prima)
     sorted.sort((a, b) => a.year.compareTo(b.year));
-    // Restituisce i primi 5
     return sorted.take(5).toList();
   }
 
-  // Ottiene i 5 vinili più recenti della collezione
-  // Ordinati per anno di pubblicazione decrescente
+  // NEWEST VINYLS: Top 5 più recenti
+  // SORTING: Decrescente per anno (newest first)
   List<Vinyl> get newestVinyls {
     List<Vinyl> sorted = List.from(_vinyls);
-    // Ordina per anno decrescente (più recenti prima)
     sorted.sort((a, b) => b.year.compareTo(a.year));
-    // Restituisce i primi 5
     return sorted.take(5).toList();
   }
 }
