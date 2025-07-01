@@ -89,6 +89,13 @@ class VinylProvider with ChangeNotifier {
   // PATTERN: Pagination/Limiting per performance UI
   List<Vinyl> get recentVinyls => _vinyls.take(5).toList();
   
+  // VISTA CASUALE: Vinili casuali per raccomandazioni
+  // ALGORITMO: Shuffle per randomizzazione
+  List<Vinyl> get randomVinyls {
+    final shuffled = List.of(_vinyls)..shuffle();
+    return shuffled.take(5).toList();
+  }
+
   // === STATISTICHE COMPUTATE ===
   // PATTERN: Analytics/Metrics derivate dallo stato
   int get totalVinyls => _vinyls.length;

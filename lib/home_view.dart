@@ -40,6 +40,10 @@ class _HomeViewState extends State<HomeView> {
                       _buildFavoriteVinylsSection(context),
                       SizedBox(height: AppConstants.spacingLarge),
                       
+                      // === RANDOM VINYLS: Vinili casuali consigliati ===
+                      _buildRandomVinylsSection(context),
+                      SizedBox(height: AppConstants.spacingLarge),
+
                       // === STATS: Statistiche rapide ===
                       _buildQuickStatsSection(context),
                     ],
@@ -112,7 +116,7 @@ class _HomeViewState extends State<HomeView> {
             borderRadius: BorderRadius.circular(AppConstants.borderRadius),
           ),
           child: Icon(
-            Icons.library_music,
+            Icons.account_circle,
             color: AppConstants.primaryColor,
             size: 32,
           ),
@@ -251,6 +255,51 @@ class _HomeViewState extends State<HomeView> {
     );
   }
   
+  Widget _buildRandomVinylsSection(BuildContext context) {
+    return Consumer<VinylProvider>(
+      builder: (context, provider, child) {
+        return Column(
+          children: [
+            _buildSectionHeader(
+              'Vinili Consigliati',
+              Icons.recommend,
+              onTap: () {
+                // Funzionalità da implementare: navigazione ai vinili consigliati
+              },
+            ),
+            SizedBox(height: AppConstants.spacingMedium),
+
+            // da modificare per  mostrare i vinili casuali
+            
+            if (provider.randomVinyls.isEmpty)
+              _buildEmptyState(
+                'Nessun vinile consigliato',
+                'Aggiungi vinili alla tua collezione per ricevere consigli!',
+                Icons.recommend,
+              )
+            else
+              SizedBox(
+                height: 160,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  itemCount: provider.randomVinyls.length,
+                  separatorBuilder: (context, index) =>
+                      SizedBox(width: AppConstants.spacingMedium),
+                  itemBuilder: (context, index) {
+                    final vinyl = provider.randomVinyls[index];
+                    return _buildVinylCard(vinyl, context);
+                  },
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+          
+
+
   // === SECTION HEADER: Widget intestazione sezione ===
   Widget _buildSectionHeader(String title, IconData icon, {VoidCallback? onTap}) {
     return Row(
