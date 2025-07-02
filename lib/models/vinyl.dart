@@ -1,5 +1,8 @@
 // Modello per rappresentare un vinile nella collezione
+
 // Contiene tutte le informazioni necessarie per catalogare un disco in vinile
+
+import 'Song.dart';
 
 // Classe che definisce la struttura dati per i vinili
 class Vinyl {
@@ -47,6 +50,9 @@ class Vinyl {
   // Spazio per commenti, ricordi, dettagli tecnici
   String? notes;
 
+  // Canzoni contenute nel disco
+ List<Song> ? song;
+
   // Costruttore della classe Vinyl
   // I campi principali sono obbligatori, altri hanno valori di default
   Vinyl({
@@ -61,6 +67,7 @@ class Vinyl {
     this.imagePath,                 // Immagine opzionale
     DateTime? dateAdded,            // Data opzionale
     this.notes,                     // Note opzionali
+    this.song,                      // Lista di Canzoni opzionali
   }) : dateAdded = dateAdded ?? DateTime.now(); // Se non fornita, usa data corrente
 
   // Factory constructor per creare Vinyl da Map del database
