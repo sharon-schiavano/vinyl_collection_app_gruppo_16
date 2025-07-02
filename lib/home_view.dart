@@ -109,16 +109,20 @@ class _HomeViewState extends State<HomeView> {
             ),
           ],
         ),
-        Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppConstants.primaryColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-          ),
-          child: Icon(
-            Icons.account_circle,
-            color: AppConstants.primaryColor,
-            size: 32,
+        GestureDetector(
+          onTap:() => Navigator.pushNamed(context, '/profile_view'),
+          child: 
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppConstants.primaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+            ),
+            child: Icon(
+              Icons.account_circle,
+              color: AppConstants.primaryColor,
+              size: 32,
+            ),
           ),
         ),
       ],
