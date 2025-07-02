@@ -150,7 +150,7 @@ class _HomeViewState extends State<HomeView> {
               )
             else
               SizedBox(
-                height: 160,
+                height: 165,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(horizontal: 4),
@@ -194,7 +194,7 @@ class _HomeViewState extends State<HomeView> {
               )
             else
               SizedBox(
-                height: 160,
+                height: 165,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(horizontal: 4),
@@ -264,13 +264,11 @@ class _HomeViewState extends State<HomeView> {
               'Vinili Consigliati',
               Icons.recommend,
               onTap: () {
-                // Funzionalità da implementare: navigazione ai vinili consigliati
+                // da cambiare!
               },
             ),
             SizedBox(height: AppConstants.spacingMedium),
 
-            // da modificare per  mostrare i vinili casuali
-            
             if (provider.randomVinyls.isEmpty)
               _buildEmptyState(
                 'Nessun vinile consigliato',
@@ -279,7 +277,7 @@ class _HomeViewState extends State<HomeView> {
               )
             else
               SizedBox(
-                height: 160,
+                height: 165,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(horizontal: 4),
@@ -328,11 +326,6 @@ class _HomeViewState extends State<HomeView> {
             onTap: onTap,
             child: Container(
               padding: EdgeInsets.all(4),
-              child: Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.grey[600],
-                size: 16,
-              ),
             ),
           ),
       ],
@@ -343,23 +336,12 @@ class _HomeViewState extends State<HomeView> {
   Widget _buildVinylCard(vinyl, BuildContext context) {
     return GestureDetector(
       onTap: () async {
-        // NAVIGATION: Naviga alla modifica vinile
-        final scaffoldMessenger = ScaffoldMessenger.of(context);
-        final result = await Navigator.push(
+        // NAVIGATION: Naviga alla schermata dettaglio vinile
+        await Navigator.pushNamed(
           context,
-          MaterialPageRoute(
-            builder: (context) => AddEditVinylScreen(vinyl: vinyl),
-          ),
+          '/DettaglioVinile',
+          arguments: vinyl,
         );
-        
-        if (result == true && mounted) {
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Text('Vinile modificato con successo!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
       },
       child: Container(
         width: 120,
