@@ -5,6 +5,10 @@ import 'search_view.dart';
 import 'analisi_view.dart';
 import 'services/vinyl_provider.dart';
 import 'utils/constants.dart';
+import 'DettaglioVinile.dart';
+import 'models/vinyl.dart';
+import 'listaVinili_view.dart';
+import 'profile_view.dart';
 
 class SchermataP extends StatefulWidget {
   const SchermataP({super.key});
@@ -68,38 +72,44 @@ class _SchermataPState extends State<SchermataP> {
         ),
         initialRoute: '/',
         routes: {
-          '/searchView': (context) => const SearchView(),
-          '/detailsView': (context) => const DetailsView(),
-          '/homeView': (context) => const HomeView(),
+          '/search_View': (context) => const SearchView(),
+          'analisi_view': (context) => const AnalisiView(),
+          '/home_view': (context) => const HomeView(),
+          '/profile_view': (context) => const ProfileView(),
+          '/listaVinili_view': (context) => const ListaViniliView(),
+          '/DettaglioVinile': (context) {
+            final vinyl = ModalRoute.of(context)!.settings.arguments as Vinyl;
+            return SchermataDettaglio(
+              vinile: vinyl,
+              items: [], // Pass the list of songs if you have them, or leave empty
+            );
+            },
         },
         home: Scaffold(
           body: IndexedStack(
             index: realIndex,
-            children: const [HomeView(), SearchView(), DetailsView()],
+            children: const [HomeView(), SearchView(), AnalisiView()],
           ),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: realIndex,
-            onTap: onSelection,
-            type: BottomNavigationBarType.fixed,
-            selectedItemColor: AppConstants.primaryColor,
-            unselectedItemColor: Colors.grey,
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home),
-                label: 'Home',
+              bottomNavigationBar: NavigationBar(
+                selectedIndex: realIndex,
+                onDestinationSelected: onSelection,
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.home),
+                    label: 'Home',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.search),
+                    label: 'Ricerca',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.analytics),
+                    label: 'Analisi',
+                  ),
+                ],
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.search),
-                label: 'Ricerca',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.analytics),
-                label: 'Analisi',
-              ),
-            ],
-          ),
+            ),
         ),
-      ),
-    );
+      );
   }
 }

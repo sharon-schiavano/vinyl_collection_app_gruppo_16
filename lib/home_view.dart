@@ -109,16 +109,20 @@ class _HomeViewState extends State<HomeView> {
             ),
           ],
         ),
-        Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppConstants.primaryColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-          ),
-          child: Icon(
-            Icons.account_circle,
-            color: AppConstants.primaryColor,
-            size: 32,
+        GestureDetector(
+          onTap:() => Navigator.pushNamed(context, '/profile_view'),
+          child: 
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppConstants.primaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+            ),
+            child: Icon(
+              Icons.account_circle,
+              color: AppConstants.primaryColor,
+              size: 32,
+            ),
           ),
         ),
       ],
@@ -130,18 +134,32 @@ class _HomeViewState extends State<HomeView> {
     return Consumer<VinylProvider>(
       builder: (context, provider, child) {
         final recentVinyls = provider.recentVinyls;
-        
+
         return Column(
           children: [
-            _buildSectionHeader(
-              'Aggiunti di Recente',
-              Icons.schedule,
-              onTap: () {
-                // Funzionalità da implementare: navigazione alla lista completa
-              },
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildSectionHeader(
+                  'Aggiunti di Recente',
+                  Icons.schedule,
+                  onTap: () {
+                    Navigator.pushNamed(context, '/listaVinili_view');
+                  },
+                ),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pushNamed(context, '/listaVinili_view');
+                  },
+                  child: Icon(
+                    Icons.arrow_forward_ios,
+                    color: AppConstants.primaryColor,
+                    size: 16,
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: AppConstants.spacingMedium),
-            
             if (recentVinyls.isEmpty)
               _buildEmptyState(
                 'Nessun vinile aggiunto',
@@ -150,12 +168,12 @@ class _HomeViewState extends State<HomeView> {
               )
             else
               SizedBox(
-                height: 160,
+                height: 165,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(horizontal: 4),
                   itemCount: recentVinyls.length,
-                  separatorBuilder: (context, index) => 
+                  separatorBuilder: (context, index) =>
                       SizedBox(width: AppConstants.spacingMedium),
                   itemBuilder: (context, index) {
                     final vinyl = recentVinyls[index];
@@ -182,6 +200,7 @@ class _HomeViewState extends State<HomeView> {
               Icons.favorite,
               onTap: () {
                 // Funzionalità da implementare: navigazione alla lista preferiti
+                Navigator.pushNamed(context, '/analisi_view');
               },
             ),
             SizedBox(height: AppConstants.spacingMedium),
@@ -194,7 +213,7 @@ class _HomeViewState extends State<HomeView> {
               )
             else
               SizedBox(
-                height: 160,
+                height: 165,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(horizontal: 4),
@@ -224,6 +243,7 @@ class _HomeViewState extends State<HomeView> {
               Icons.analytics,
               onTap: () {
                 // Funzionalità da implementare: navigazione alle statistiche complete
+                Navigator.pushNamed(context, '/analisi_view');
               },
             ),
             SizedBox(height: AppConstants.spacingMedium),
@@ -264,13 +284,11 @@ class _HomeViewState extends State<HomeView> {
               'Vinili Consigliati',
               Icons.recommend,
               onTap: () {
-                // Funzionalità da implementare: navigazione ai vinili consigliati
+                // da cambiare!
               },
             ),
             SizedBox(height: AppConstants.spacingMedium),
 
-            // da modificare per  mostrare i vinili casuali
-            
             if (provider.randomVinyls.isEmpty)
               _buildEmptyState(
                 'Nessun vinile consigliato',
@@ -279,7 +297,7 @@ class _HomeViewState extends State<HomeView> {
               )
             else
               SizedBox(
-                height: 160,
+                height: 165,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(horizontal: 4),
@@ -328,11 +346,6 @@ class _HomeViewState extends State<HomeView> {
             onTap: onTap,
             child: Container(
               padding: EdgeInsets.all(4),
-              child: Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.grey[600],
-                size: 16,
-              ),
             ),
           ),
       ],
@@ -343,23 +356,12 @@ class _HomeViewState extends State<HomeView> {
   Widget _buildVinylCard(vinyl, BuildContext context) {
     return GestureDetector(
       onTap: () async {
-        // NAVIGATION: Naviga alla modifica vinile
-        final scaffoldMessenger = ScaffoldMessenger.of(context);
-        final result = await Navigator.push(
+        // NAVIGATION: Naviga alla schermata dettaglio vinile
+        await Navigator.pushNamed(
           context,
-          MaterialPageRoute(
-            builder: (context) => AddEditVinylScreen(vinyl: vinyl),
-          ),
+          '/DettaglioVinile',
+          arguments: vinyl,
         );
-        
-        if (result == true && mounted) {
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Text('Vinile modificato con successo!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
       },
       child: Container(
         width: 120,
