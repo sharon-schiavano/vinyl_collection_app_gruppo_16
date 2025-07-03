@@ -90,29 +90,26 @@ class _SchermataPState extends State<SchermataP> {
             index: realIndex,
             children: const [HomeView(), SearchView(), AnalisiView()],
           ),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: realIndex,
-            onTap: onSelection,
-            type: BottomNavigationBarType.fixed,
-            selectedItemColor: AppConstants.primaryColor,
-            unselectedItemColor: Colors.grey,
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home),
-                label: 'Home',
+              bottomNavigationBar: NavigationBar(
+                selectedIndex: realIndex,
+                onDestinationSelected: onSelection,
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.home),
+                    label: 'Home',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.search),
+                    label: 'Ricerca',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.analytics),
+                    label: 'Analisi',
+                  ),
+                ],
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.search),
-                label: 'Ricerca',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.analytics),
-                label: 'Analisi',
-              ),
-            ],
-          ),
+            ),
         ),
-      ),
-    );
+      );
   }
 }
