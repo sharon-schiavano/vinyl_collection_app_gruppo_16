@@ -46,7 +46,7 @@ class AnalisiView extends StatelessWidget {
         ),
         body:SingleChildScrollView(
         child:Padding(
-          padding: const EdgeInsets.only(top: 30),
+          padding: const EdgeInsets.fromLTRB(10, 30, 10, 30),
           child: Center(
             child: Column(
               children: [
@@ -54,14 +54,14 @@ class AnalisiView extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
 
-                    Padding(padding: const EdgeInsets.all(20), 
+                    Padding(padding: const EdgeInsets.all(10), 
                     child:SizedBox(
                       width: 200,
                       height: 200,
                       child: GraficoATorta(generiColori),
                     ),),
                     SizedBox(
-                      width: 200,
+                      width: 150,
                       height: 200,
                     child:ListView(
                       children: [
