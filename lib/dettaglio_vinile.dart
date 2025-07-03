@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:typed_data';
-import 'models/Song.dart';
-import 'models/category.dart';
+import 'models/song_.dart';
 import 'models/vinyl.dart';
 
 class ViewDisco extends StatelessWidget {
@@ -58,39 +56,6 @@ class CanzoniItem implements ListItem {
       Text('Artista: ${canzone.artista} \nAnno: ${canzone.anno}');
 }
 
-void main() {
-  final List<Song> canzoni = [
-    Song('Bohemian Rhapsody', 'Queen', '1975'),
-    Song('Imagine', 'John Lennon', '1971'),
-    Song('Smells Like Teen Spirit', 'Nirvana', '1991'),
-    Song('Billie Jean', 'Michael Jackson', '1982'),
-    Song('Hotel California', 'Eagles', '1976'),
-    Song('Like a Rolling Stone', 'Bob Dylan', '1965'),
-    Song('Hey Jude', 'The Beatles', '1968'),
-    Song('Rolling in the Deep', 'Adele', '2010'),
-  ];
-
-  final vin = Vinyl(
-    title:'The Dark Side of the Moon',
-    artist: 'Pink Floyd',
-    year: 1973,
-    label: 'Harvest Records',
-    imagePath: "https://m.media-amazon.com/images/I/610RGJlG1ZL._UF1000,1000_QL80_.jpg",
-    song: canzoni,
-    genre: 'Progressive Rock', // Add a suitable genre
-    condition: 'Excellent',    // Add a suitable condition
-  );
-
-  runApp(
-    SchermataDettaglio(
-      items: List<ListItem>.generate(
-        canzoni.length,
-        (i) => CanzoniItem(canzoni[i % canzoni.length]),
-      ),
-      vinile: vin,
-    ),
-  );
-}
 
 class SchermataDettaglio extends StatelessWidget {
   final List<ListItem> items;

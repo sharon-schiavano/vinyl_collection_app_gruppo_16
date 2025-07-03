@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:vinyl_collection_app_gruppo_16/utils/constants.dart';
+import 'package:vinyl_collection_app_gruppo_16/services/database_service.dart';
 class AnalisiView extends StatelessWidget {
   const AnalisiView({super.key});
 
@@ -94,6 +95,11 @@ class AnalisiView extends StatelessWidget {
                   height: 500,
                   child: GraficoALinee(),
                 ),  
+                SizedBox(
+                   width: 700,
+                  height: 500,
+                  child: Ultime5Canzoni(),
+                )
               ],
             ),
           ),
@@ -105,50 +111,73 @@ class AnalisiView extends StatelessWidget {
 }
 
 class GraficoATorta extends StatelessWidget {
-  final Map<String, Color> generiColori;
-  const GraficoATorta(
-    this.generiColori, {Key? key}
-  ) : super(key: key);
+    Map<String, Color> generiColori;
+    DatabaseService db= DatabaseService();
+    Map<String,int>? generiDistribution;
+    int? totaleVinili;
 
+    GraficoATorta(
+    this.generiColori, {super.key}
+  );
 
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<List<dynamic>>(
+      future: Future.wait([
+        db.getGenreDistribution(),
+        db.getTotalVinylCount(),
+      ]),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator( color: Colors.blue,));
+        }
+        if (snapshot.hasError || !snapshot.hasData) {
+          return const Center(child: Text('Errore nel caricamento dei dati'));
+        }
 
-    const List<String> generi= AppConstants.defaultGenres;
-    List<DatiGrafico> dati = List<DatiGrafico>.empty(growable: true);
+        final Map<String, int> generiDistribution = snapshot.data![0] as Map<String, int>;
+        final int totaleVinili = snapshot.data![1] as int;
+        final List<String> generi = AppConstants.defaultGenres;
+        List<DatiGrafico> dati = [];
 
-    for (var genere in generi) {
-      print(10/generi.length);
-      dati.add(DatiGrafico(
-        value: 10 / generi.length,
-        color: generiColori[genere] ?? Colors.grey,
-        title: genere,
-      ));
-    }
+        for (var genere in generi) {
+          final int count = generiDistribution[genere] ?? 0;
+          final double value = totaleVinili > 0 ? count / totaleVinili : 0.0;
+          dati.add(DatiGrafico(
+            value: value*100,
+            color: generiColori[genere] ?? Colors.grey,
+            title: genere,
+          ));
+        }
 
-    return PieChart(
-      PieChartData(
-        sections: dati.map((e)=> PieChartSectionData(
-          value: e.value,
-          color: e.color,
-          title: e.value.toStringAsFixed(1),
-          radius: 50,
-          titleStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black, // Use the color from the data
+        return PieChart(
+          PieChartData(
+            sections: dati
+                .map((e) => PieChartSectionData(
+                      value: e.value,
+                      color: e.color,
+                      title: (e.value * 100).toStringAsFixed(1) + '%',
+                      radius: 50,
+                      titleStyle: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                      borderSide: const BorderSide(
+                        color: Colors.black,
+                        width: 2,
+                      ),
+                    ))
+                .toList(),
+            centerSpaceRadius: 50,
           ),
-          borderSide: const BorderSide(
-            color: Colors.black,
-            width: 2,
-          ),
-        )).toList(),
-        centerSpaceRadius: 50,
-      ),
+        );
+      },
     );
   }
 }
+
 
 class GraficoALinee extends StatelessWidget {
   
@@ -263,4 +292,36 @@ class DatiGrafico{
   final String title;
   DatiGrafico({required this.value, required this.color, required this.title});
   // Constructor to initialize the properties
+}
+
+
+class Ultime5Canzoni extends StatelessWidget {
+  const Ultime5Canzoni({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<dynamic>>(
+      future: DatabaseService().getRecentVinyls(limit:5),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator( color: Colors.blue,));
+        }
+        if (snapshot.hasError || !snapshot.hasData) {
+          return const Center(child: Text('Errore nel caricamento dei dati'));
+        }
+
+        final List<dynamic> canzoni = snapshot.data!;
+        return ListView.builder(
+          itemCount: canzoni.length,
+          itemBuilder: (context, index) {
+            final canzone = canzoni[index];
+            return ListTile(
+              title: Text(canzone['title']),
+              subtitle: Text(canzone['artist']),
+            );
+          },
+        );
+      },
+    );
+  }
 }
