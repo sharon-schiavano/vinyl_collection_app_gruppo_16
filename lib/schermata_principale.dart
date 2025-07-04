@@ -8,7 +8,7 @@ import 'utils/constants.dart';
 import 'dettaglio_vinile.dart';
 import 'models/vinyl.dart';
 import 'lista_vinili_view.dart';
-import 'profile_view.dart';
+
 
 class SchermataP extends StatefulWidget {
   const SchermataP({super.key});
@@ -75,7 +75,7 @@ class _SchermataPState extends State<SchermataP> {
           '/search_View': (context) => const SearchView(),
           'analisi_view': (context) => const AnalisiView(),
           '/home_view': (context) => const HomeView(),
-          '/profile_view': (context) => const ProfileView(),
+
           '/listaVinili_view': (context) => const ListaViniliView(),
           '/DettaglioVinile': (context) {
             final vinyl = ModalRoute.of(context)!.settings.arguments as Vinyl;

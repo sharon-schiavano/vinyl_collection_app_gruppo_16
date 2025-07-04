@@ -52,6 +52,8 @@ class AppConstants {
   static const String vinylTable = 'vinili';
   // Nome della tabella che contiene le categorie/generi musicali
   static const String categoryTable = 'categorie';
+  // Nome della tabella che contiene le canzoni dei vinili
+  static const String songsTable = 'songs';
   
   // === CONDIZIONI DEI VINILI ===
   // Lista predefinita delle possibili condizioni di conservazione

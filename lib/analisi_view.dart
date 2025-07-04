@@ -111,10 +111,8 @@ class AnalisiView extends StatelessWidget {
 }
 
 class GraficoATorta extends StatelessWidget {
-    Map<String, Color> generiColori;
-    DatabaseService db= DatabaseService();
-    Map<String,int>? generiDistribution;
-    int? totaleVinili;
+    final Map<String, Color> generiColori;
+    final DatabaseService db = DatabaseService();
 
     GraficoATorta(
     this.generiColori, {super.key}
@@ -157,7 +155,7 @@ class GraficoATorta extends StatelessWidget {
                 .map((e) => PieChartSectionData(
                       value: e.value,
                       color: e.color,
-                      title: (e.value * 100).toStringAsFixed(1) + '%',
+                      title: '${e.value.toStringAsFixed(1)}%',
                       radius: 50,
                       titleStyle: const TextStyle(
                         fontSize: 16,

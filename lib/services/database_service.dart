@@ -9,6 +9,7 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:path/path.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/vinyl.dart';
+import '../models/song_.dart';
 import '../models/category.dart' as models;
 import '../utils/constants.dart';
 
@@ -102,6 +103,22 @@ class DatabaseService {
       )
     ''');
 
+    // === CREAZIONE TABELLA CANZONI ===
+    // FOREIGN KEY: Collega ogni canzone a un vinile specifico
+    // ON DELETE CASCADE: Elimina automaticamente le canzoni quando si elimina un vinile
+    await db.execute('''
+      CREATE TABLE ${AppConstants.songsTable} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,  -- ID univoco auto-incrementale
+        vinylId INTEGER NOT NULL,              -- ID del vinile a cui appartiene la canzone
+        titolo TEXT NOT NULL,                  -- Titolo della canzone
+        artista TEXT NOT NULL,                 -- Artista della canzone
+        anno INTEGER NOT NULL,                 -- Anno della canzone
+        trackNumber INTEGER,                   -- Numero della traccia nell'album
+        duration TEXT,                         -- Durata della canzone (formato MM:SS)
+        FOREIGN KEY (vinylId) REFERENCES ${AppConstants.vinylTable} (id) ON DELETE CASCADE
+      )
+    ''');
+
     // === INSERIMENTO DATI INIZIALI ===
     // Popola il database con categorie predefinite
     // FOR LOOP: Itera attraverso i generi predefiniti
@@ -126,17 +143,31 @@ class DatabaseService {
   Future<int> insertVinyl(Vinyl vinyl) async {
     // AWAIT: Aspetta che il database sia pronto
     final db = await database;
-    // INSERT: Converte l'oggetto Vinyl in Map per SQLite
-    // AWAIT: Aspetta che l'inserimento sia completato
-    int id = await db.insert(AppConstants.vinylTable, vinyl.toMap());
+    
+    // TRANSAZIONE: Garantisce che vinile e canzoni vengano inseriti insieme
+    int vinylId = 0;
+    await db.transaction((txn) async {
+      // INSERT: Converte l'oggetto Vinyl in Map per SQLite
+      vinylId = await txn.insert(AppConstants.vinylTable, vinyl.toMap());
+      
+      // Inserisce le canzoni se presenti
+      if (vinyl.song != null && vinyl.song!.isNotEmpty) {
+        for (Song song in vinyl.song!) {
+          Map<String, dynamic> songMap = song.toMap();
+          songMap['vinylId'] = vinylId;
+          await txn.insert(AppConstants.songsTable, songMap);
+        }
+      }
+    });
+    
     // Aggiorna il contatore della categoria (operazione atomica)
     await _updateCategoryCount(vinyl.genre, 1);
-    return id;
+    return vinylId;
   }
 
   // Recupera tutti i vinili ordinati per data di aggiunta
   // ASYNC: Query al database è operazione asincrona
-  // RETURN: Lista di oggetti Vinyl
+  // RETURN: Lista di oggetti Vinyl con canzoni caricate
   Future<List<Vinyl>> getAllVinyls() async {
     final db = await database;
     // QUERY: Operazione SQL SELECT con ordinamento
@@ -145,9 +176,18 @@ class DatabaseService {
       AppConstants.vinylTable,
       orderBy: 'dateAdded DESC',
     );
-    // LIST.GENERATE: Converte ogni Map in oggetto Vinyl
-    // MOTIVO: SQLite restituisce Map, ma l'app usa oggetti tipizzati
-    return List.generate(maps.length, (i) => Vinyl.fromMap(maps[i]));
+    
+    // CARICAMENTO LAZY: Carica le canzoni per ogni vinile
+    List<Vinyl> vinyls = [];
+    for (var map in maps) {
+      Vinyl vinyl = Vinyl.fromMap(map);
+      // Carica le canzoni associate se il vinile ha un ID
+      if (vinyl.id != null) {
+        vinyl.song = await getSongsByVinylId(vinyl.id!);
+      }
+      vinyls.add(vinyl);
+    }
+    return vinyls;
   }
 
   // Trova un vinile specifico tramite ID
@@ -164,7 +204,10 @@ class DatabaseService {
     );
     // Controlla se è stato trovato almeno un risultato
     if (maps.isNotEmpty) {
-      return Vinyl.fromMap(maps.first);
+      Vinyl vinyl = Vinyl.fromMap(maps.first);
+      // Carica le canzoni associate al vinile
+      vinyl.song = await getSongsByVinylId(id);
+      return vinyl;
     }
     return null; // Nessun vinile trovato con quell'ID
   }
@@ -229,14 +272,36 @@ class DatabaseService {
   // UPDATE: Modifica record esistente mantenendo lo stesso ID
   Future<void> updateVinyl(Vinyl vinyl) async {
     final db = await database;
-    // UPDATE: Sostituisce tutti i campi del record
-    // WHERE: Identifica il record specifico da aggiornare
-    await db.update(
-      AppConstants.vinylTable,
-      vinyl.toMap(),           // Nuovi valori da salvare
-      where: 'id = ?',         // Condizione per trovare il record
-      whereArgs: [vinyl.id],   // ID del vinile da aggiornare
-    );
+    
+    // TRANSAZIONE: Garantisce che vinile e canzoni vengano aggiornati insieme
+    await db.transaction((txn) async {
+      // UPDATE: Sostituisce tutti i campi del record
+      await txn.update(
+        AppConstants.vinylTable,
+        vinyl.toMap(),           // Nuovi valori da salvare
+        where: 'id = ?',         // Condizione per trovare il record
+        whereArgs: [vinyl.id],   // ID del vinile da aggiornare
+      );
+      
+      // Aggiorna le canzoni: elimina le vecchie e inserisce le nuove
+      if (vinyl.id != null) {
+        // Elimina tutte le canzoni esistenti per questo vinile
+        await txn.delete(
+          AppConstants.songsTable,
+          where: 'vinylId = ?',
+          whereArgs: [vinyl.id],
+        );
+        
+        // Inserisce le nuove canzoni se presenti
+        if (vinyl.song != null && vinyl.song!.isNotEmpty) {
+          for (Song song in vinyl.song!) {
+            Map<String, dynamic> songMap = song.toMap();
+            songMap['vinylId'] = vinyl.id;
+            await txn.insert(AppConstants.songsTable, songMap);
+          }
+        }
+      }
+    });
   }
 
   // Elimina un vinile dal database
@@ -366,6 +431,203 @@ class DatabaseService {
       limit: limit,          // Limita i risultati
     );
     return List.generate(maps.length, (i) => Vinyl.fromMap(maps[i]));
+  }
+
+  // === RAGGRUPPAMENTO TEMPORALE: ANALISI CRONOLOGICA ===
+  // 
+  // Raggruppa i vinili per anno e mese di aggiunta alla collezione
+  // STRUTTURA DATI: Map<Anno, Map<Mese, List<Vinyl>>>
+  // MOTIVAZIONE: Permette analisi temporali dettagliate e visualizzazioni cronologiche
+  // PATTERN: Nested Map per raggruppamento gerarchico
+  // 
+  // VANTAGGI:
+  // - Accesso O(1) per anno specifico
+  // - Accesso O(1) per mese specifico dentro un anno
+  // - Struttura naturale per grafici temporali
+  // - Facilita calcoli di crescita mensile/annuale
+  // 
+  // UTILIZZO:
+  // - Grafici di crescita della collezione nel tempo
+  // - Analisi stagionalità degli acquisti
+  // - Report mensili/annuali
+  // - Timeline interattive
+  Future<Map<int, Map<int, List<Vinyl>>>> getVinylsByYearAndMonth() async {
+    final db = await database;
+    
+    // QUERY: Recupera tutti i vinili ordinati per data di aggiunta
+    // ORDER BY: Cronologico crescente per costruzione logica della timeline
+    final List<Map<String, dynamic>> maps = await db.query(
+      AppConstants.vinylTable,
+      orderBy: 'dateAdded ASC', // Dal più vecchio al più recente
+    );
+    
+    // INIZIALIZZAZIONE: Struttura dati nested per raggruppamento
+    // OUTER MAP: Anno -> Inner Map
+    // INNER MAP: Mese -> Lista Vinili
+    Map<int, Map<int, List<Vinyl>>> groupedVinyls = {};
+    
+    // PROCESSING: Itera attraverso ogni vinile per raggruppamento
+    for (var map in maps) {
+      // CONVERSION: Converte Map SQL in oggetto Vinyl tipizzato
+      Vinyl vinyl = Vinyl.fromMap(map);
+      
+      // PARSING: Estrae anno e mese dalla data di aggiunta
+      // NOTA: vinyl.dateAdded è già un DateTime (convertito in fromMap)
+      // EXTRACT: Estrae componenti temporali dall'oggetto DateTime
+      int year = vinyl.dateAdded.year;   // Estrae anno (es: 2024)
+      int month = vinyl.dateAdded.month; // Estrae mese (1-12)
+      
+      // NESTED INITIALIZATION: Crea strutture se non esistono
+      // PATTERN: Lazy initialization per evitare null pointer
+      
+      // LEVEL 1: Inizializza Map per l'anno se non esiste
+      if (!groupedVinyls.containsKey(year)) {
+        groupedVinyls[year] = <int, List<Vinyl>>{};
+      }
+      
+      // LEVEL 2: Inizializza List per il mese se non esiste
+      if (!groupedVinyls[year]!.containsKey(month)) {
+        groupedVinyls[year]![month] = <Vinyl>[];
+      }
+      
+      // INSERTION: Aggiunge il vinile alla lista appropriata
+      // APPEND: Mantiene ordine cronologico all'interno del mese
+      groupedVinyls[year]![month]!.add(vinyl);
+    }
+    
+    return groupedVinyls;
+  }
+  
+  // === METODI HELPER PER ANALISI TEMPORALE ===
+  
+  // Conta i vinili aggiunti per ogni mese di un anno specifico
+  // UTILITY: Semplifica l'accesso ai conteggi mensili
+  // RETURN: Map<Mese, Conteggio> per un anno specifico
+  Future<Map<int, int>> getMonthlyCountForYear(int year) async {
+    final groupedVinyls = await getVinylsByYearAndMonth();
+    Map<int, int> monthlyCount = {};
+    
+    // INITIALIZATION: Inizializza tutti i mesi a 0
+    // MOTIVO: Garantisce che tutti i mesi siano rappresentati anche se vuoti
+    for (int month = 1; month <= 12; month++) {
+      monthlyCount[month] = 0;
+    }
+    
+    // COUNTING: Conta i vinili per ogni mese dell'anno specificato
+    if (groupedVinyls.containsKey(year)) {
+      groupedVinyls[year]!.forEach((month, vinyls) {
+        monthlyCount[month] = vinyls.length;
+      });
+    }
+    
+    return monthlyCount;
+  }
+  
+  // Conta i vinili aggiunti per ogni anno
+  // AGGREGATION: Somma tutti i mesi per ottenere totale annuale
+  // RETURN: Map<Anno, Conteggio> per tutti gli anni
+  Future<Map<int, int>> getYearlyCount() async {
+    final groupedVinyls = await getVinylsByYearAndMonth();
+    Map<int, int> yearlyCount = {};
+    
+    // AGGREGATION: Somma i vinili di tutti i mesi per ogni anno
+    groupedVinyls.forEach((year, monthsMap) {
+      int totalForYear = 0;
+      monthsMap.forEach((month, vinyls) {
+        totalForYear += vinyls.length;
+      });
+      yearlyCount[year] = totalForYear;
+    });
+    
+    return yearlyCount;
+  }
+  
+  // Recupera i vinili di un mese specifico
+  // DIRECT ACCESS: Accesso diretto a un sottoinsieme temporale
+  // PARAMETERS: Anno e mese specifici
+  // RETURN: Lista vinili per il periodo specificato
+  Future<List<Vinyl>> getVinylsForMonth(int year, int month) async {
+    final groupedVinyls = await getVinylsByYearAndMonth();
+    
+    // SAFE ACCESS: Verifica esistenza prima dell'accesso
+    if (groupedVinyls.containsKey(year) && 
+        groupedVinyls[year]!.containsKey(month)) {
+      return groupedVinyls[year]![month]!;
+    }
+    
+    // EMPTY RESULT: Restituisce lista vuota se non trovato
+    return <Vinyl>[];
+  }
+
+  // === OPERAZIONI CRUD PER CANZONI ===
+  
+  // Inserisce una nuova canzone associata a un vinile
+  // FOREIGN KEY: vinylId deve esistere nella tabella vinili
+  Future<int> insertSong(Song song, int vinylId) async {
+    final db = await database;
+    // Crea una mappa con i dati della canzone includendo vinylId
+    Map<String, dynamic> songMap = song.toMap();
+    songMap['vinylId'] = vinylId;
+    
+    return await db.insert(AppConstants.songsTable, songMap);
+  }
+  
+  // Recupera tutte le canzoni di un vinile specifico
+  // JOIN: Collega le tabelle vinili e canzoni tramite foreign key
+  Future<List<Song>> getSongsByVinylId(int vinylId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      AppConstants.songsTable,
+      where: 'vinylId = ?',
+      whereArgs: [vinylId],
+      orderBy: 'trackNumber ASC', // Ordina per numero di traccia
+    );
+    return List.generate(maps.length, (i) => Song.fromMap(maps[i]));
+  }
+  
+  // Aggiorna una canzone esistente
+  Future<void> updateSong(Song song) async {
+    final db = await database;
+    await db.update(
+      AppConstants.songsTable,
+      song.toMap(),
+      where: 'id = ?',
+      whereArgs: [song.id],
+    );
+  }
+  
+  // Elimina una canzone specifica
+  Future<void> deleteSong(int songId) async {
+    final db = await database;
+    await db.delete(
+      AppConstants.songsTable,
+      where: 'id = ?',
+      whereArgs: [songId],
+    );
+  }
+  
+  // Elimina tutte le canzoni di un vinile
+  // UTILIZZATO: Quando si elimina un vinile o si vuole rimuovere tutte le tracce
+  Future<void> deleteSongsByVinylId(int vinylId) async {
+    final db = await database;
+    await db.delete(
+      AppConstants.songsTable,
+      where: 'vinylId = ?',
+      whereArgs: [vinylId],
+    );
+  }
+  
+  // Inserisce multiple canzoni per un vinile in una transazione
+  // TRANSAZIONE: Garantisce che tutte le canzoni vengano inserite o nessuna
+  Future<void> insertSongsForVinyl(List<Song> songs, int vinylId) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      for (Song song in songs) {
+        Map<String, dynamic> songMap = song.toMap();
+        songMap['vinylId'] = vinylId;
+        await txn.insert(AppConstants.songsTable, songMap);
+      }
+    });
   }
 
   // Chiude la connessione al database

@@ -20,6 +20,7 @@
 // Utilizza il pattern Provider per gestire lo stato globale dell'applicazione
 
 // Import necessari per il funzionamento del provider
+import 'dart:async';
 import 'package:flutter/foundation.dart';  // Per ChangeNotifier e debugPrint
 import '../models/vinyl.dart';              // Modello dati Vinyl
 import '../models/category.dart' as models; // Modello dati Category (con alias)
@@ -60,6 +61,14 @@ class VinylProvider with ChangeNotifier {
   // PATTERN: Loading State per UX migliorata
   bool _isLoading = false;
   
+  // Cache per le proprietà computate
+  List<Vinyl>? _cachedFavorites;
+  List<Vinyl>? _cachedRandom;
+  Map<String, int>? _cachedGenreDistribution;
+  
+  // Timer per il debouncing della ricerca
+  Timer? _searchTimer;
+  
   // === GETTERS PUBBLICI: CONTROLLED ACCESS PATTERN ===
   // MOTIVAZIONE: Accesso read-only per prevenire modifiche accidentali
   // PATTERN: Immutable Views per garantire data integrity
@@ -83,7 +92,10 @@ class VinylProvider with ChangeNotifier {
   
   // FILTRO DINAMICO: Lista preferiti calcolata in tempo reale
   // VANTAGGIO: Sempre sincronizzata, nessun rischio di inconsistenza
-  List<Vinyl> get favoriteVinyls => _vinyls.where((vinyl) => vinyl.isFavorite).toList();
+  List<Vinyl> get favoriteVinyls {
+    _cachedFavorites ??= _vinyls.where((vinyl) => vinyl.isFavorite).toList();
+    return _cachedFavorites!;
+  }
   
   // VISTA LIMITATA: Ultimi 5 vinili aggiunti
   // PATTERN: Pagination/Limiting per performance UI
@@ -92,8 +104,11 @@ class VinylProvider with ChangeNotifier {
   // VISTA CASUALE: Vinili casuali per raccomandazioni
   // ALGORITMO: Shuffle per randomizzazione
   List<Vinyl> get randomVinyls {
-    final shuffled = List.of(_vinyls)..shuffle();
-    return shuffled.take(5).toList();
+    if (_cachedRandom == null) {
+      final shuffled = List.of(_vinyls)..shuffle();
+      _cachedRandom = shuffled.take(5).toList();
+    }
+    return _cachedRandom!;
   }
 
   // === STATISTICHE COMPUTATE ===
@@ -105,12 +120,14 @@ class VinylProvider with ChangeNotifier {
   // ALGORITMO: Conta occorrenze usando Map come accumulatore
   // COMPLESSITÀ: O(n) ma accettabile per dataset tipici
   Map<String, int> get genreDistribution {
-    Map<String, int> distribution = {};
-    // PATTERN: Reduce/Fold per aggregazione dati
-    for (var vinyl in _vinyls) {
-      distribution[vinyl.genre] = (distribution[vinyl.genre] ?? 0) + 1;
+    if (_cachedGenreDistribution == null) {
+      _cachedGenreDistribution = {};
+      // PATTERN: Reduce/Fold per aggregazione dati
+      for (var vinyl in _vinyls) {
+        _cachedGenreDistribution![vinyl.genre] = (_cachedGenreDistribution![vinyl.genre] ?? 0) + 1;
+      }
     }
-    return distribution;
+    return _cachedGenreDistribution!;
   }
 
   // === INIZIALIZZAZIONE: BOOTSTRAP PATTERN ===
@@ -150,6 +167,8 @@ class VinylProvider with ChangeNotifier {
     try {
       // DATABASE QUERY: Recupero dati persistenti
       _vinyls = await _databaseService.getAllVinyls();
+      // CACHE INVALIDATION: Invalida cache quando i dati vengono ricaricati
+      _invalidateCache();
       // FILTER APPLICATION: Mantiene coerenza vista filtrata
       _applyFilters();
       // UI NOTIFICATION: Aggiornamento reattivo interfaccia
@@ -194,6 +213,7 @@ class VinylProvider with ChangeNotifier {
       
       // FILTER CONSISTENCY: Mantiene coerenza vista filtrata
       _applyFilters();
+      _invalidateCache(); // Invalida la cache
       
       // SUCCESS FEEDBACK: Notifica completamento operazione
       _isLoading = false;
@@ -226,6 +246,7 @@ class VinylProvider with ChangeNotifier {
         _applyFilters(); // FILTER REFRESH: Ricalcola vista filtrata
       }
       
+      _invalidateCache(); // Invalida la cache
       _isLoading = false;
       notifyListeners();
       return true;
@@ -253,6 +274,7 @@ class VinylProvider with ChangeNotifier {
       
       // FILTER REFRESH: Aggiorna vista filtrata
       _applyFilters();
+      _invalidateCache(); // Invalida la cache
       
       _isLoading = false;
       notifyListeners();
@@ -277,7 +299,11 @@ class VinylProvider with ChangeNotifier {
         // IMMUTABLE UPDATE: Crea nuova istanza con modifica
         Vinyl updatedVinyl = vinyl.copyWith(isFavorite: !vinyl.isFavorite);
         // DELEGATION: Riusa logica updateVinyl per consistenza
-        return await updateVinyl(updatedVinyl);
+        bool result = await updateVinyl(updatedVinyl);
+        if (result) {
+          _invalidateCache(); // Invalida la cache
+        }
+        return result;
       }
       return false;
     } catch (e) {
@@ -297,10 +323,17 @@ class VinylProvider with ChangeNotifier {
   void searchVinyls(String query) {
     // NORMALIZATION: Lowercase per ricerca case-insensitive
     _searchQuery = query.toLowerCase();
-    // FILTER APPLICATION: Ricalcola risultati
-    _applyFilters();
-    // UI UPDATE: Notifica cambiamento vista
-    notifyListeners();
+    
+    // Cancella il timer precedente se esiste
+    _searchTimer?.cancel();
+    
+    // Implementa debouncing con delay di 300ms
+    _searchTimer = Timer(const Duration(milliseconds: 300), () {
+      // FILTER APPLICATION: Ricalcola risultati
+      _applyFilters();
+      // UI UPDATE: Notifica cambiamento vista
+      notifyListeners();
+    });
   }
 
   // GENRE FILTER: Filtro per categoria
@@ -425,5 +458,23 @@ class VinylProvider with ChangeNotifier {
     List<Vinyl> sorted = List.from(_vinyls);
     sorted.sort((a, b) => b.year.compareTo(a.year));
     return sorted.take(5).toList();
+  }
+
+  // === CACHE MANAGEMENT ===
+  // PATTERN: Cache Invalidation per performance ottimizzate
+  // MOTIVAZIONE: Invalida cache computate quando i dati cambiano
+  void _invalidateCache() {
+    _cachedFavorites = null;
+    _cachedRandom = null;
+    _cachedGenreDistribution = null;
+  }
+  
+  // === CLEANUP ===
+  // PATTERN: Resource Management per prevenire memory leaks
+  // MOTIVAZIONE: Cancella timer attivi quando il provider viene distrutto
+  @override
+  void dispose() {
+    _searchTimer?.cancel();
+    super.dispose();
   }
 }
