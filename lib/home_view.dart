@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:io';
 
 // Import dei servizi e schermate necessari
 import 'services/vinyl_provider.dart';
@@ -156,99 +155,10 @@ class _HomeViewState extends State<HomeView> {
   }
 
   // === RECENT VINYLS SECTION: Sezione vinili recenti ===
-  Widget _buildRecentVinylsSection(BuildContext context) {
-    return Consumer<VinylProvider>(
-      builder: (context, provider, child) {
-        final recentVinyls = provider.recentVinyls;
-
-        return Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                buildSectionHeader(
-                  'Aggiunti di Recente',
-                  Icons.schedule,
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pushNamed(context, '/listaVinili_view');
-                  },
-                  child: Icon(
-                    Icons.arrow_forward_ios,
-                    color: AppConstants.primaryColor,
-                    size: 16,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: AppConstants.spacingMedium),
-            if (recentVinyls.isEmpty)
-              buildEmptyState(
-                'Nessun vinile aggiunto',
-                'Inizia aggiungendo il tuo primo vinile alla collezione!',
-                Icons.album,
-              )
-            else
-              SizedBox(
-                height: 165,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  itemCount: recentVinyls.length,
-                  separatorBuilder: (context, index) =>
-                      SizedBox(width: AppConstants.spacingMedium),
-                  itemBuilder: (context, index) {
-                    final vinyl = recentVinyls[index];
-                    return buildVinylCard(vinyl, context);
-                  },
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
+  
   
   // === FAVORITE VINYLS SECTION: Sezione vinili preferiti ===
-  Widget _buildFavoriteVinylsSection(BuildContext context) {
-    return Consumer<VinylProvider>(
-      builder: (context, provider, child) {
-        final favoriteVinyls = provider.favoriteVinyls;
-        
-        return Column(
-          children: [
-            buildSectionHeader(
-              'I Tuoi Preferiti',
-              Icons.favorite),
-            SizedBox(height: AppConstants.spacingMedium),
-            
-            if (favoriteVinyls.isEmpty)
-              buildEmptyState(
-                'Nessun preferito',
-                'Marca i tuoi vinili preferiti per vederli qui!',
-                Icons.favorite_border,
-              )
-            else
-              SizedBox(
-                height: 165,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  itemCount: favoriteVinyls.length,
-                  separatorBuilder: (context, index) => 
-                      SizedBox(width: AppConstants.spacingMedium),
-                  itemBuilder: (context, index) {
-                    final vinyl = favoriteVinyls[index];
-                    return buildVinylCard(vinyl, context);
-                  },
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
+
   
   // === QUICK STATS SECTION: Sezione statistiche rapide ===
   Widget _buildQuickStatsSection(BuildContext context) {
@@ -290,43 +200,6 @@ class _HomeViewState extends State<HomeView> {
   }
   
   // === RANDOM VINYLS SECTION: sezione vinili consigliati casualmente ===
-  Widget _buildRandomVinylsSection(BuildContext context) {
-    return Consumer<VinylProvider>(
-      builder: (context, provider, child) {
-        return Column(
-          children: [
-            buildSectionHeader(
-              'Vinili Consigliati',
-              Icons.recommend,
-            ),
-            SizedBox(height: AppConstants.spacingMedium),
-
-            if (provider.randomVinyls.isEmpty)
-              buildEmptyState(
-                'Nessun vinile consigliato',
-                'Aggiungi vinili alla tua collezione per ricevere consigli!',
-                Icons.recommend,
-              )
-            else
-              SizedBox(
-                height: 165,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  itemCount: provider.randomVinyls.length,
-                  separatorBuilder: (context, index) =>
-                      SizedBox(width: AppConstants.spacingMedium),
-                  itemBuilder: (context, index) {
-                    final vinyl = provider.randomVinyls[index];
-                    return buildVinylCard(vinyl, context);
-                  },
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
           
 
 }
