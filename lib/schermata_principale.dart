@@ -5,9 +5,9 @@ import 'search_view.dart';
 import 'analisi_view.dart';
 import 'services/vinyl_provider.dart';
 import 'utils/constants.dart';
-import 'DettaglioVinile.dart';
+import 'dettaglio_vinile.dart';
 import 'models/vinyl.dart';
-import 'listaVinili_view.dart';
+import 'lista_vinili_view.dart';
 import 'profile_view.dart';
 
 class SchermataP extends StatefulWidget {

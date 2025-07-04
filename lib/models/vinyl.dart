@@ -2,7 +2,7 @@
 
 // Contiene tutte le informazioni necessarie per catalogare un disco in vinile
 
-import 'Song.dart';
+import 'song_.dart';
 
 // Classe che definisce la struttura dati per i vinili
 class Vinyl {
@@ -51,7 +51,7 @@ class Vinyl {
   String? notes;
 
   // Canzoni contenute nel disco
- List<Song> ? song;
+ List<Song>? song;
 
   // Costruttore della classe Vinyl
   // I campi principali sono obbligatori, altri hanno valori di default
