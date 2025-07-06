@@ -85,12 +85,12 @@ class SearchView extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Anno: ${vinyl.year ?? "-"}',
+                                  'Anno: ${vinyl.year}',
                                   style: const TextStyle(fontSize: 14, color: Colors.grey),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Genere: ${vinyl.genre ?? "-"}',
+                                  'Genere: ${vinyl.genre}',
                                   style: const TextStyle(fontSize: 14, color: Colors.grey),
                                 ),
                               ],
