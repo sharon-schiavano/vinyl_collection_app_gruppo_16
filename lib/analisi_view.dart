@@ -33,7 +33,7 @@ class AnalisiView extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.deepPurple,
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.blue,
+          backgroundColor: AppConstants.primaryColor,
           foregroundColor: Colors.white,
         ),
       ),
