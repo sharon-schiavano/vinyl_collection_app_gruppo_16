@@ -21,10 +21,10 @@
 
 // Import necessari per il funzionamento del provider
 import 'dart:async';
-import 'package:flutter/foundation.dart';  // Per ChangeNotifier e debugPrint
-import '../models/vinyl.dart';              // Modello dati Vinyl
+import 'package:flutter/foundation.dart'; // Per ChangeNotifier e debugPrint
+import '../models/vinyl.dart'; // Modello dati Vinyl
 import '../models/category.dart' as models; // Modello dati Category (con alias)
-import 'database_service.dart';             // Servizio per operazioni database
+import 'database_service.dart'; // Servizio per operazioni database
 
 // === CLASSE PRINCIPALE: VINYL PROVIDER ===
 // Implementa il pattern "Facade" per semplificare l'accesso ai dati
@@ -35,72 +35,82 @@ class VinylProvider with ChangeNotifier {
   // MOTIVAZIONE: Facilita testing e manutenibilità
   // ALTERNATIVA: Si potrebbe usare get_it per DI più avanzata
   final DatabaseService _databaseService = DatabaseService();
-  
+
   // === STATO PRIVATO: ENCAPSULATION PATTERN ===
   // MOTIVAZIONE: Controllo completo sull'accesso e modifica dei dati
   // PATTERN: Information Hiding per garantire consistenza dello stato
-  
+
   // CACHE LOCALE: Lista completa dei vinili (Source of Truth locale)
   // MOTIVAZIONE: Evita query ripetute al database per performance
   List<Vinyl> _vinyls = [];
-  
+
   // CACHE CATEGORIE: Lista delle categorie/generi musicali
   List<models.Category> _categories = [];
-  
+
   // VISTA FILTRATA: Risultato di ricerche e filtri applicati
   // PATTERN: Computed Property per performance ottimizzate
   List<Vinyl> _filteredVinyls = [];
-  
+
   // STATO UI: Query di ricerca corrente
   String _searchQuery = '';
-  
+
   // STATO FILTRO: Genere selezionato per il filtro
   String _selectedGenre = 'Tutti';
-  
+
+  //STATO PER FILTRO CONDIZIONE
+  String _selectedCondition = 'Tutte';
+
   // STATO LOADING: Flag per feedback visivo durante operazioni async
   // PATTERN: Loading State per UX migliorata
   bool _isLoading = false;
-  
+
   // Cache per le proprietà computate
   List<Vinyl>? _cachedFavorites;
   List<Vinyl>? _cachedRandom;
   Map<String, int>? _cachedGenreDistribution;
-  
+
   // Timer per il debouncing della ricerca
   Timer? _searchTimer;
-  
+
   // === GETTERS PUBBLICI: CONTROLLED ACCESS PATTERN ===
   // MOTIVAZIONE: Accesso read-only per prevenire modifiche accidentali
   // PATTERN: Immutable Views per garantire data integrity
-  
+
   List<Vinyl> get vinyls => _vinyls;
   List<models.Category> get categories => _categories;
-  
+
   // COMPUTED PROPERTY: Vista intelligente che decide quale lista mostrare
   // ALGORITMO: Mostra lista filtrata se ci sono filtri attivi, altrimenti lista completa
   // PERFORMANCE: Evita calcoli inutili quando non ci sono filtri
-  List<Vinyl> get filteredVinyls => _filteredVinyls.isEmpty && _searchQuery.isEmpty && _selectedGenre == 'Tutti' ? _vinyls : _filteredVinyls;
-  
+  List<Vinyl> get filteredVinyls =>
+      _filteredVinyls.isEmpty &&
+          _searchQuery.isEmpty &&
+          _selectedGenre == 'Tutti' &&
+        _selectedCondition == 'Tutte' 
+      ? _vinyls
+      : _filteredVinyls;
+
   String get searchQuery => _searchQuery;
   String get selectedGenre => _selectedGenre;
   bool get isLoading => _isLoading;
-  
+  String get selectedCondition => _selectedCondition;
+
   // === GETTERS COMPUTATI: DERIVED STATE PATTERN ===
   // MOTIVAZIONE: Calcoli derivati dallo stato principale
   // PATTERN: Computed Properties per evitare duplicazione dati
   // PERFORMANCE: Calcolo on-demand invece di storage ridondante
-  
+
   // FILTRO DINAMICO: Lista preferiti calcolata in tempo reale
   // VANTAGGIO: Sempre sincronizzata, nessun rischio di inconsistenza
   List<Vinyl> get favoriteVinyls {
     _cachedFavorites ??= _vinyls.where((vinyl) => vinyl.isFavorite).toList();
     return _cachedFavorites!;
   }
-  
+
   // VISTA LIMITATA: Ultimi 5 vinili aggiunti
   // PATTERN: Pagination/Limiting per performance UI
   List<Vinyl> get recentVinyls => _vinyls.take(5).toList();
-  
+
   // VISTA CASUALE: Vinili casuali per raccomandazioni
   // ALGORITMO: Shuffle per randomizzazione
   List<Vinyl> get randomVinyls {
@@ -115,7 +125,7 @@ class VinylProvider with ChangeNotifier {
   // PATTERN: Analytics/Metrics derivate dallo stato
   int get totalVinyls => _vinyls.length;
   int get favoriteCount => favoriteVinyls.length;
-  
+
   // AGGREGAZIONE DINAMICA: Distribuzione per genere
   // ALGORITMO: Conta occorrenze usando Map come accumulatore
   // COMPLESSITÀ: O(n) ma accettabile per dataset tipici
@@ -124,7 +134,8 @@ class VinylProvider with ChangeNotifier {
       _cachedGenreDistribution = {};
       // PATTERN: Reduce/Fold per aggregazione dati
       for (var vinyl in _vinyls) {
-        _cachedGenreDistribution![vinyl.genre] = (_cachedGenreDistribution![vinyl.genre] ?? 0) + 1;
+        _cachedGenreDistribution![vinyl.genre] =
+            (_cachedGenreDistribution![vinyl.genre] ?? 0) + 1;
       }
     }
     return _cachedGenreDistribution!;
@@ -133,7 +144,7 @@ class VinylProvider with ChangeNotifier {
   // === INIZIALIZZAZIONE: BOOTSTRAP PATTERN ===
   // PATTERN: Initialization Strategy per setup completo
   // MOTIVAZIONE: Caricamento coordinato di tutti i dati necessari
-  
+
   // METODO PRINCIPALE: Orchestrazione del caricamento iniziale
   // PATTERN: Facade per semplificare operazioni complesse
   // ERROR HANDLING: Try-catch con cleanup garantito (finally)
@@ -141,7 +152,7 @@ class VinylProvider with ChangeNotifier {
     // LOADING STATE: Feedback visivo immediato
     _isLoading = true;
     notifyListeners(); // OBSERVER: Notifica UI del cambio stato
-    
+
     try {
       // OPERAZIONI PARALLELE: Caricamento coordinato
       // NOTA: Si potrebbe usare Future.wait per parallelizzazione
@@ -160,7 +171,7 @@ class VinylProvider with ChangeNotifier {
   // === CARICAMENTO DATI: REPOSITORY PATTERN ===
   // PATTERN: Data Loading Strategy con cache locale
   // MOTIVAZIONE: Separazione tra persistenza e business logic
-  
+
   // CARICAMENTO VINILI: Sincronizzazione database -> memoria
   // SIDE EFFECTS: Aggiorna cache locale e applica filtri
   Future<void> loadVinyls() async {
@@ -193,7 +204,7 @@ class VinylProvider with ChangeNotifier {
   // PATTERN: Command per incapsulare operazioni business
   // MOTIVAZIONE: Operazioni atomiche con rollback e feedback
   // CONSISTENCY: Sincronizzazione database <-> cache locale
-  
+
   // CREATE: Aggiunta nuovo vinile
   // TRANSACTION PATTERN: Operazione atomica con rollback su errore
   // OPTIMISTIC UPDATE: Aggiorna cache prima di conferma database
@@ -202,19 +213,19 @@ class VinylProvider with ChangeNotifier {
       // LOADING FEEDBACK: UX durante operazione asincrona
       _isLoading = true;
       notifyListeners();
-      
+
       // DATABASE PERSISTENCE: Salvataggio permanente
       int id = await _databaseService.insertVinyl(vinyl);
       vinyl.id = id; // ID ASSIGNMENT: Sincronizzazione chiave primaria
-      
+
       // CACHE UPDATE: Aggiornamento immediato lista locale
       // STRATEGY: Insert at beginning per "most recent first"
       _vinyls.insert(0, vinyl);
-      
+
       // FILTER CONSISTENCY: Mantiene coerenza vista filtrata
       _applyFilters();
       _invalidateCache(); // Invalida la cache
-      
+
       // SUCCESS FEEDBACK: Notifica completamento operazione
       _isLoading = false;
       notifyListeners();
@@ -234,10 +245,10 @@ class VinylProvider with ChangeNotifier {
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       // DATABASE UPDATE: Persistenza modifiche
       await _databaseService.updateVinyl(vinyl);
-      
+
       // CACHE SYNCHRONIZATION: Aggiornamento lista locale
       // ALGORITHM: Find-and-replace per mantenere posizione
       int index = _vinyls.indexWhere((v) => v.id == vinyl.id);
@@ -245,7 +256,7 @@ class VinylProvider with ChangeNotifier {
         _vinyls[index] = vinyl; // IN-PLACE UPDATE
         _applyFilters(); // FILTER REFRESH: Ricalcola vista filtrata
       }
-      
+
       _invalidateCache(); // Invalida la cache
       _isLoading = false;
       notifyListeners();
@@ -264,18 +275,18 @@ class VinylProvider with ChangeNotifier {
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       // DATABASE DELETION: Rimozione permanente
       await _databaseService.deleteVinyl(id);
-      
+
       // CACHE CLEANUP: Rimozione da lista locale
       // ALGORITHM: Filter-out per rimozione efficiente
       _vinyls.removeWhere((vinyl) => vinyl.id == id);
-      
+
       // FILTER REFRESH: Aggiorna vista filtrata
       _applyFilters();
       _invalidateCache(); // Invalida la cache
-      
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -316,17 +327,17 @@ class VinylProvider with ChangeNotifier {
   // PATTERN: Filter Strategy per ricerca multi-criterio
   // PERFORMANCE: Filtri applicati in memoria per velocità
   // ALGORITHM: Combinazione AND di filtri multipli
-  
+
   // SEARCH: Ricerca testuale multi-campo
   // ALGORITHM: Case-insensitive substring matching
   // FIELDS: Titolo, artista, etichetta, genere
   void searchVinyls(String query) {
     // NORMALIZATION: Lowercase per ricerca case-insensitive
     _searchQuery = query.toLowerCase();
-    
+
     // Cancella il timer precedente se esiste
     _searchTimer?.cancel();
-    
+
     // Implementa debouncing con delay di 300ms
     _searchTimer = Timer(const Duration(milliseconds: 300), () {
       // FILTER APPLICATION: Ricalcola risultati
@@ -334,6 +345,13 @@ class VinylProvider with ChangeNotifier {
       // UI UPDATE: Notifica cambiamento vista
       notifyListeners();
     });
+  }
+
+  void filterByCondition(String condition) {
+    _selectedCondition = condition;
+    _invalidateCache();
+    _applyFilters();
+    notifyListeners();
   }
 
   // GENRE FILTER: Filtro per categoria
@@ -349,6 +367,7 @@ class VinylProvider with ChangeNotifier {
   void clearFilters() {
     _searchQuery = '';
     _selectedGenre = 'Tutti';
+    _selectedCondition = 'Tutte';
     _filteredVinyls = []; // CLEAR CACHE: Forza uso lista completa
     notifyListeners();
   }
@@ -359,30 +378,39 @@ class VinylProvider with ChangeNotifier {
   void _applyFilters() {
     // COPY STRATEGY: Lavora su copia per non modificare originale
     List<Vinyl> filtered = List.from(_vinyls);
-    
+
     // TEXT FILTER: Ricerca multi-campo
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((vinyl) {
         // MULTI-FIELD SEARCH: OR logic tra campi diversi
         return vinyl.title.toLowerCase().contains(_searchQuery) ||
-               vinyl.artist.toLowerCase().contains(_searchQuery) ||
-               vinyl.label.toLowerCase().contains(_searchQuery) ||
-               vinyl.genre.toLowerCase().contains(_searchQuery);
+            vinyl.artist.toLowerCase().contains(_searchQuery) ||
+            vinyl.label.toLowerCase().contains(_searchQuery) ||
+            vinyl.genre.toLowerCase().contains(_searchQuery);
       }).toList();
     }
-    
+
     // GENRE FILTER: Filtro esatto per categoria
     if (_selectedGenre != 'Tutti') {
-      filtered = filtered.where((vinyl) => vinyl.genre == _selectedGenre).toList();
+      filtered = filtered
+          .where((vinyl) => vinyl.genre == _selectedGenre)
+          .toList();
     }
-    
+
+    // CONDITION FILTER: Filtro per stato di conservazione
+    if (_selectedCondition != 'Tutte') {
+      filtered = filtered
+          .where((vinyl) => vinyl.condition == _selectedCondition)
+          .toList();
+    }
+
     // RESULT ASSIGNMENT: Aggiorna cache filtrata
     _filteredVinyls = filtered;
   }
 
   // === UTILITY METHODS: HELPER PATTERN ===
   // PATTERN: Utility Functions per operazioni comuni
-  
+
   // FIND BY ID: Ricerca diretta per chiave primaria
   // ALGORITHM: Linear search (accettabile per dataset tipici)
   // RETURN: Nullable per gestione "not found"
@@ -392,6 +420,15 @@ class VinylProvider with ChangeNotifier {
     } catch (e) {
       return null; // NOT FOUND: Gestione elegante assenza
     }
+  }
+
+  //AVAILABLE CONDITIONS: Lista delle condizioni
+
+  List<String> get availableConditions {
+    Set<String> conditions = _vinyls.map((vinyl) => vinyl.condition).toSet();
+    List<String> conditionList = ['Tutte'];
+    conditionList.addAll(conditions.toList()..sort());
+    return conditionList;
   }
 
   // AVAILABLE GENRES: Lista dinamica generi
@@ -416,14 +453,22 @@ class VinylProvider with ChangeNotifier {
   // ARTIST FILTER: Ricerca per artista
   // ALGORITHM: Case-insensitive partial matching
   List<Vinyl> getVinylsByArtist(String artist) {
-    return _vinyls.where((vinyl) => 
-        vinyl.artist.toLowerCase().contains(artist.toLowerCase())).toList();
+    return _vinyls
+        .where(
+          (vinyl) => vinyl.artist.toLowerCase().contains(artist.toLowerCase()),
+        )
+        .toList();
+  }
+
+  //CONDITIONS FILTER: Ricerca per condizione
+  List<Vinyl> getVinylsByCondition(String condition) {
+    return _vinyls.where((vinyl) => vinyl.condition == condition).toList();
   }
 
   // === ANALYTICS: STATISTICAL PATTERN ===
   // PATTERN: Data Analytics per insights business
   // PERFORMANCE: Calcolo on-demand per dati sempre aggiornati
-  
+
   // YEAR DISTRIBUTION: Analisi temporale collezione
   // ALGORITHM: Frequency counting con Map come accumulatore
   Map<int, int> get yearDistribution {
@@ -468,7 +513,7 @@ class VinylProvider with ChangeNotifier {
     _cachedRandom = null;
     _cachedGenreDistribution = null;
   }
-  
+
   // === CLEANUP ===
   // PATTERN: Resource Management per prevenire memory leaks
   // MOTIVAZIONE: Cancella timer attivi quando il provider viene distrutto
